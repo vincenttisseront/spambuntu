@@ -50,14 +50,14 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+[ -f "$PUBKEY" ] || die "clé publique de signature introuvable ($PUBKEY). Générez-la avec tools/gen-signing-key.sh puis commitez appliance/etc/update-pubkey.pem"
+grep -q 'BEGIN PUBLIC KEY' "$PUBKEY" || die "$PUBKEY n'est pas une clé publique PEM"
+if grep -q 'PRIVATE KEY' "$PUBKEY"; then die "$PUBKEY contient une clé PRIVÉE : abandon"; fi
+
 for tool in xorriso gpg curl python3 sha256sum; do
     command -v "$tool" >/dev/null 2>&1 || die "outil manquant : $tool"
 done
 [ "$EMBED_DEBS" -eq 0 ] || command -v dpkg-scanpackages >/dev/null 2>&1 || die "outil manquant : dpkg-scanpackages (paquet dpkg-dev)"
-
-[ -f "$PUBKEY" ] || die "clé publique de signature introuvable ($PUBKEY). Générez-la avec tools/gen-signing-key.sh puis commitez appliance/etc/update-pubkey.pem"
-grep -q 'BEGIN PUBLIC KEY' "$PUBKEY" || die "$PUBKEY n'est pas une clé publique PEM"
-if grep -q 'PRIVATE KEY' "$PUBKEY"; then die "$PUBKEY contient une clé PRIVÉE : abandon"; fi
 
 VERSION="$(tr -d '[:space:]' < VERSION)"
 SUFFIX=""
