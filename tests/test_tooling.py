@@ -34,6 +34,7 @@ def repo_copy(tmp_path):
     shutil.copytree(ROOT / "tools", dest / "tools")
     for name in ("VERSION", "MIN_FROM_VERSION", "CHANGELOG.md"):
         shutil.copy(ROOT / name, dest / name)
+    (dest / "appliance" / "etc" / "update-pubkey.pem").unlink(missing_ok=True)   # les tests ne dépendent pas de la vraie clé
     return dest
 
 
