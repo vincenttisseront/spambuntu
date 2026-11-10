@@ -39,6 +39,44 @@ def test_health_url_auto_reads_webui_env(env):
     assert env.cfg(health_url="none").resolve_health_url() is None
 
 
+def test_health_url_is_https_when_console_has_a_certificate(env):
+    (env.etc / "webui.env").write_text(
+        "SPAMBUNTU_BIND=0.0.0.0:8443\n"
+        "SPAMBUNTU_TLS_ARGS=--certfile=/etc/spambuntu/tls/console.crt --keyfile=/etc/spambuntu/tls/console.key\n")
+    assert env.cfg(health_url="auto").resolve_health_url() == "https://127.0.0.1:8443/healthz"
+    (env.etc / "webui.env").write_text("SPAMBUNTU_BIND=0.0.0.0:8443\nSPAMBUNTU_TLS_ARGS=\n")
+    assert env.cfg(health_url="auto").resolve_health_url() == "http://127.0.0.1:8443/healthz"
+
+
+def test_health_check_accepts_the_consoles_self_signed_certificate(env, tmp_path):
+    """Contrôle de santé contre un vrai serveur HTTPS à certificat auto-signé (comme la console de l'appliance)."""
+    import subprocess
+    import threading
+    from werkzeug.serving import make_server
+
+    crt, key = tmp_path / "c.crt", tmp_path / "c.key"
+    subprocess.run(["openssl", "req", "-x509", "-nodes", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+                    "-days", "1", "-subj", "/CN=test", "-keyout", str(key), "-out", str(crt)],
+                   check=True, capture_output=True)
+
+    def wsgi(environ, start_response):
+        body = json.dumps({"status": "ok", "version": env.current()}).encode()
+        start_response("200 OK", [("Content-Type", "application/json"), ("Content-Length", str(len(body)))])
+        return [body]
+
+    server = make_server("127.0.0.1", 0, wsgi, ssl_context=(str(crt), str(key)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        cfg = env.cfg(health_url=f"https://127.0.0.1:{server.server_port}/healthz", health_timeout=5)
+        progress = upd.Progress(cfg, "test", "0.1.0", "0.1.0")
+        upd.wait_healthy(cfg, progress, "0.1.0")                    # ne lève pas
+        with pytest.raises(upd.UpdateError):
+            upd.wait_healthy(env.cfg(health_url=cfg.health_url, health_timeout=2), progress, "9.9.9")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 # ------------------------------------------------------------------ détection
 
 def test_check_detects_new_version(env):

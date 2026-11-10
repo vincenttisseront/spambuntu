@@ -1,0 +1,35 @@
+#cloud-config
+# Installation de Spambuntu : « autoinstall » d'Ubuntu Server (subiquity).
+#
+# Sécurité : sans le paramètre noyau « autoinstall », l'installateur demande une confirmation
+# explicite avant d'effacer le disque. L'entrée de menu « Installer Spambuntu » ne le passe donc pas.
+# Adaptez locale, clavier et fuseau horaire à vos besoins.
+autoinstall:
+  version: 1
+  refresh-installer:
+    update: false
+  locale: fr_FR.UTF-8
+  keyboard:
+    layout: fr
+  timezone: Europe/Paris
+  # Le compte administrateur est saisi pendant l'installation : aucun mot de passe par défaut dans l'ISO.
+  interactive-sections:
+    - identity
+  apt:
+    # Pas de sondage géographique ; si aucun miroir n'est joignable, installation hors ligne.
+    geoip: false
+    fallback: offline-install
+  storage:
+    layout:
+      name: direct
+  ssh:
+    install-server: true
+    allow-pw: true
+  late-commands:
+    - mkdir -p /target/root/spambuntu-install
+    - cp -a /cdrom/spambuntu/. /target/root/spambuntu-install/
+    - >-
+      curtin in-target --target=/target --
+      env SPAMBUNTU_PASSWORD_FILE=/root/spambuntu-console-password.txt
+      bash /root/spambuntu-install/install.sh --no-start
+    - rm -rf /target/root/spambuntu-install

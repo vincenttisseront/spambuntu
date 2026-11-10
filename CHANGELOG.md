@@ -12,3 +12,7 @@ console web de l'appliance au moment de proposer la mise à jour.
 - Retour arrière automatique si la nouvelle version ne démarre pas correctement, et retour
   manuel à la version précédente depuis la console.
 - Recherche quotidienne automatique de nouvelles versions.
+- Console servie en HTTPS (port 8443, certificat auto-signé), mot de passe initial écrit dans
+  `/root/spambuntu-console-password.txt`.
+- `spambuntu-update verify` : contrôle, sans l'installer, qu'une release publiée est utilisable.
+- ISO d'installation (`tools/build-iso.sh`, workflow *ISO*) basée sur Ubuntu Server 24.04.

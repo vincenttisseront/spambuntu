@@ -7,6 +7,9 @@
 #   --no-start                     n'active pas / ne démarre pas les services (construction d'ISO)
 #   DESTDIR=/chemin ./install.sh   installe dans une arborescence sans toucher au système
 #                                  (ni paquets, ni utilisateur, ni systemctl) : ISO et tests
+#   SPAMBUNTU_PASSWORD_FILE=/root/spambuntu-console-password.txt
+#                                  écrit le mot de passe initial de la console dans ce fichier
+#                                  (0600) au lieu de l'afficher : installation depuis l'ISO
 set -euo pipefail
 
 MODE=fresh
@@ -15,7 +18,7 @@ for arg in "$@"; do
     case "$arg" in
         --refresh) MODE=refresh ;;
         --no-start) START=0 ;;
-        -h | --help) sed -n '2,11p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        -h | --help) sed -n '2,14p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "Option inconnue : $arg" >&2; exit 2 ;;
     esac
 done
@@ -47,9 +50,21 @@ install_packages() {
     [ -z "$D" ] || return 0
     [ -z "${SKIP_PACKAGES:-}" ] || return 0
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -q
     mapfile -t packages < <(grep -vE '^\s*(#|$)' "$SRC/packages.txt")
-    apt-get install -y -q --no-install-recommends "${packages[@]}"
+    if [ -f "$SRC/debs/Packages" ]; then
+        # Dépôt apt embarqué (ISO) : installation possible sans accès à internet.
+        # Seule cette source est consultée ; les paquets déjà installés ne sont pas rétrogradés.
+        local list
+        list="$(mktemp)"
+        echo "deb [trusted=yes] file:$SRC/debs ./" > "$list"
+        local opts=(-o "Dir::Etc::sourcelist=$list" -o "Dir::Etc::sourceparts=-" -o "APT::Get::List-Cleanup=0" -o "APT::Sandbox::User=root")
+        apt-get "${opts[@]}" update -q
+        apt-get "${opts[@]}" install -y -q --no-install-recommends "${packages[@]}"
+        rm -f "$list"
+    else
+        apt-get update -q
+        apt-get install -y -q --no-install-recommends "${packages[@]}"
+    fi
 }
 
 create_user() {
@@ -75,6 +90,7 @@ install_release() {
         rm -rf "$dest"
         mkdir -p "$dest"
         cp -a "$SRC/." "$dest/"
+        rm -rf "$dest/debs"     # dépôt apt de l'ISO : inutile dans la release installée
     fi
     ln -sfn "releases/$VERSION" "$OPT/current"
 }
@@ -121,6 +137,28 @@ install_pubkey() {
     fi
 }
 
+install_tls() {
+    # Certificat auto-signé pour la console (HTTPS). Jamais écrasé s'il existe déjà.
+    local dir="$ETC/tls"
+    [ ! -f "$dir/console.crt" ] || return 0
+    command -v openssl >/dev/null 2>&1 || die "openssl est requis pour générer le certificat de la console"
+    mkd 0750 root:spambuntu "$dir"
+    local host
+    host="$(tr -d '[:space:]' < /etc/hostname 2>/dev/null || true)"
+    host="${host:-spambuntu}"
+    openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -days 3650 \
+        -subj "/CN=$host" -addext "subjectAltName=DNS:$host,DNS:localhost,IP:127.0.0.1" \
+        -keyout "$dir/console.key" -out "$dir/console.crt" 2>/dev/null
+    chmod 0640 "$dir/console.key"
+    chmod 0644 "$dir/console.crt"
+    own root:spambuntu "$dir/console.key"
+}
+
+install_motd() {
+    mkdir -p "$D/etc/update-motd.d"
+    install -m 0755 "$SRC/motd/90-spambuntu" "$D/etc/update-motd.d/90-spambuntu"
+}
+
 install_config() {
     if [ ! -f "$ETC/update.conf" ]; then
         install -m 0640 "$SRC/etc/update.conf.example" "$ETC/update.conf"
@@ -130,7 +168,11 @@ install_config() {
         install -m 0644 "$SRC/etc/webui.env.example" "$ETC/webui.env"
     fi
     if [ ! -f "$ETC/webui.json" ]; then
-        SPAMBUNTU_WEBUI_CONF="$ETC/webui.json" python3 "$SRC/bin/spambuntu-passwd" --random
+        local args=(--random --secure-cookies)
+        if [ -n "${SPAMBUNTU_PASSWORD_FILE:-}" ]; then
+            args+=(--password-file "$D$SPAMBUNTU_PASSWORD_FILE")
+        fi
+        SPAMBUNTU_WEBUI_CONF="$ETC/webui.json" python3 "$SRC/bin/spambuntu-passwd" "${args[@]}"
     fi
 }
 
@@ -149,6 +191,7 @@ if [ "$MODE" = refresh ]; then
     install_units
     install_sudoers
     install_pubkey
+    install_motd
     echo "Rafraîchissement de la version $VERSION terminé"
 else
     install_packages
@@ -158,8 +201,10 @@ else
     install_wrappers
     install_units
     install_sudoers
+    install_tls
     install_config
     install_pubkey
+    install_motd
     enable_services
-    echo "Spambuntu $VERSION installé. Console : voir SPAMBUNTU_BIND dans /etc/spambuntu/webui.env (défaut http://127.0.0.1:8080)"
+    echo "Spambuntu $VERSION installé. Console : https://<adresse-ip>:8443 (certificat auto-signé)"
 fi

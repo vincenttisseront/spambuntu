@@ -47,10 +47,39 @@ Disposition sur l'appliance :
 2. **Dépôt privé ?** L'appliance doit alors lire les releases avec un jeton GitHub en lecture
    seule (fine-grained, permission *Contents: Read* sur ce seul dépôt), à placer dans
    `/etc/spambuntu/update.conf` (`token = …` ou `token_file = …`). Un dépôt public n'en a pas besoin.
-3. **Première installation** d'une appliance : extraire une archive de release (ou l'embarquer
-   dans l'ISO) puis `sudo ./install.sh` (`--no-start` pour la construction d'une ISO). Le script
-   affiche une fois le mot de passe administrateur de la console ; `spambuntu-passwd` permet de
-   le changer. La clé publique est embarquée dans l'archive : l'ISO n'a donc rien d'autre à contenir.
+3. **Pousser le tag `v0.1.0`** (voir « Publier une version ») : le workflow *Release* publie la
+   première release signée. Sans elle, une appliance fraîchement installée n'a rien à détecter.
+4. **Générer l'ISO** (voir ci-dessous).
+
+## Générer l'ISO d'installation
+
+```bash
+tools/build-iso.sh                  # → dist/spambuntu-0.1.0-amd64.iso (+ .sha256)
+```
+
+Ou, sans rien installer en local : onglet *Actions* → *ISO* → *Run workflow* (l'ISO, ~4 Go, est un
+artefact du workflow : elle dépasse la limite de 2 Gio des fichiers de release GitHub).
+
+C'est l'ISO officielle Ubuntu Server 24.04 (téléchargée, puis vérifiée par la signature GPG de
+`SHA256SUMS` et la somme SHA-256), à laquelle on ajoute la release Spambuntu, les quelques paquets
+Ubuntu qui manquent (Flask, gunicorn, openssl, sudo : l'installation n'a pas besoin d'internet) et
+une entrée de menu « Installer Spambuntu ». Le script refuse de construire une ISO sans la clé
+publique de signature (`appliance/etc/update-pubkey.pem`) : une appliance sans elle refuserait
+toutes les mises à jour.
+
+À l'installation, Ubuntu demande confirmation avant d'effacer le disque et vous fait créer le compte
+administrateur du système. Spambuntu est ensuite installé automatiquement ; le mot de passe initial
+de la console web (`https://<adresse-ip>:8443`, certificat auto-signé) est dans
+`/root/spambuntu-console-password.txt`, rappelé à la connexion. Changez-le avec `sudo spambuntu-passwd`.
+
+Une appliance qui n'est pas installée par l'ISO s'installe depuis l'archive d'une release :
+`sudo ./install.sh` (`--no-start` pour préparer une image).
+
+**Vérifier que la chaîne de mise à jour fonctionne** (aucune installation, pas besoin d'être root) :
+
+```bash
+spambuntu-update verify        # télécharge la dernière release, contrôle la signature avec la clé de l'appliance
+```
 
 ## Publier une version
 

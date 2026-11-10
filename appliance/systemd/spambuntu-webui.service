@@ -9,9 +9,10 @@ User=spambuntu
 Group=spambuntu
 WorkingDirectory=/opt/spambuntu/current/webui
 Environment=SPAMBUNTU_BIND=127.0.0.1:8080
+Environment=SPAMBUNTU_TLS_ARGS=
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=-/etc/spambuntu/webui.env
-ExecStart=/usr/bin/gunicorn --workers 2 --bind ${SPAMBUNTU_BIND} --access-logfile - "app:create_app()"
+ExecStart=/usr/bin/gunicorn --workers 2 --bind ${SPAMBUNTU_BIND} $SPAMBUNTU_TLS_ARGS --access-logfile - "app:create_app()"
 Restart=on-failure
 RestartSec=3
 PrivateTmp=yes

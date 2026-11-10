@@ -6,3 +6,5 @@ __pycache__/
 *.pem
 !appliance/etc/update-pubkey.pem
 .spambuntu-signing/
+.iso-cache/
+*.iso

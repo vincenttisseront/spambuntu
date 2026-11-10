@@ -178,6 +178,17 @@ def test_fresh_install_into_destdir_then_login(repo_copy, tmp_path):
     assert oct((dest / "var/lib/spambuntu/backups").stat().st_mode & 0o777) == "0o700"
     assert "AVERTISSEMENT" in r.stderr            # pas de clé publique dans ce dépôt de test
 
+    # Console servie en HTTPS : certificat auto-signé, clé protégée, cookies réservés à HTTPS
+    tls = dest / "etc/spambuntu/tls"
+    assert oct((tls / "console.key").stat().st_mode & 0o777) == "0o640"
+    cert = run(["openssl", "x509", "-in", str(tls / "console.crt"), "-noout", "-text"]).stdout
+    assert "DNS:localhost" in cert and "IP Address:127.0.0.1" in cert
+    env_file = (dest / "etc/spambuntu/webui.env").read_text()
+    assert "SPAMBUNTU_BIND=0.0.0.0:8443" in env_file and "--certfile=/etc/spambuntu/tls/console.crt" in env_file
+    assert json.loads(webui_json.read_text())["cookie_secure"] is True
+    assert (dest / "etc/update-motd.d/90-spambuntu").stat().st_mode & 0o111
+    assert "ExecStart=/usr/bin/gunicorn" in (dest / "etc/systemd/system/spambuntu-webui.service").read_text()
+
     # Le mot de passe affiché à l'installation ouvre vraiment la console
     password = re.search(r"Mot de passe .*: (\S+)", r.stdout).group(1)
     import app as webapp
@@ -193,6 +204,31 @@ def test_fresh_install_into_destdir_then_login(repo_copy, tmp_path):
     assert webui_json.read_text() == before and "Mot de passe" not in again.stdout
 
 
+def test_install_can_store_initial_password_in_a_file(repo_copy, tmp_path):
+    bundle = build(repo_copy, "0.2.0", tmp_path / "out")
+    extract = tmp_path / "extract"
+    with tarfile.open(bundle) as tar:
+        tar.extractall(extract, filter="data")
+    dest = tmp_path / "dest"
+    r = run(["bash", str(extract / "spambuntu-0.2.0" / "install.sh"), "--no-start"],
+            env={"DESTDIR": str(dest), "SPAMBUNTU_PASSWORD_FILE": "/root/spambuntu-console-password.txt"})
+    pw_file = dest / "root/spambuntu-console-password.txt"
+    assert oct(pw_file.stat().st_mode & 0o777) == "0o600"
+    content = pw_file.read_text()
+    password = re.search(r"Mot de passe : (\S+)", content).group(1)
+    assert password not in r.stdout and password not in r.stderr        # jamais affiché dans le journal d'installation
+    import app as webapp
+    client = webapp.create_app(str(dest / "etc/spambuntu/webui.json")).test_client()
+    token = re.search(r'name="csrf-token" content="([0-9a-f]+)"', client.get("/login").get_data(as_text=True)).group(1)
+    assert client.post("/login", data={"username": "admin", "password": password, "csrf_token": token}).status_code == 302
+
+
+def test_motd_is_silent_outside_an_appliance():
+    motd = ROOT / "appliance" / "motd" / "90-spambuntu"
+    r = run(["sh", str(motd)])          # hors appliance : n'affiche rien et ne plante pas
+    assert r.stdout == ""
+
+
 def test_install_refuses_raw_checkout_and_unknown_option(repo_copy):
     r = run(["bash", str(repo_copy / "appliance" / "install.sh")], env={"DESTDIR": str(repo_copy / "d")}, check=False)
     assert r.returncode != 0 and "VERSION introuvable" in r.stderr
@@ -202,10 +238,10 @@ def test_install_refuses_raw_checkout_and_unknown_option(repo_copy):
 
 # ------------------------------------------------------------------ mise à jour de bout en bout avec une vraie archive
 
-def publish_real(env, repo, version):
+def publish_real(env, repo, version, signed_with=None):
     bundle = build(repo, version, env.tmp / f"out-{version}")
     data = bundle.read_bytes()
-    env.github.add(version, data, sign(data, env.priv, env.tmp))
+    env.github.add(version, data, sign(data, signed_with or env.priv, env.tmp))
 
 
 def test_real_bundle_update_end_to_end(env, repo_copy, monkeypatch):
@@ -270,3 +306,114 @@ def test_gitignore_does_not_hide_source_files():
     r = subprocess.run(["git", "check-ignore", "--no-index", "--stdin"], cwd=ROOT, input="\n".join(files),
                        capture_output=True, text=True)
     assert r.stdout.strip() == "", f"fichiers ignorés par erreur : {r.stdout}"
+
+
+# --- ISO ---------------------------------------------------------------------------------------
+
+def _load_tool(name):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(name, ROOT / "tools" / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_iso_manifest_parsing_applies_additions_and_removals(tmp_path):
+    mod = _load_tool("iso_debs")
+    first = tmp_path / "a.manifest"
+    second = tmp_path / "b.manifest"
+    first.write_text("--- a\n+++ b\n+libssl3t64:amd64\t3.0.1\n+sudo\t1.9\n+gone\t1\n", encoding="utf-8")
+    second.write_text("--- a\n+++ b\n-gone\t1\n+python3\t3.12\n", encoding="utf-8")
+    inst = mod.installed_set([first, second])
+    assert set(inst) == {"libssl3t64", "sudo", "python3"}
+    assert inst["libssl3t64"] == ("libssl3t64:amd64", "3.0.1")
+    status = tmp_path / "status"
+    mod.write_status(inst, status)
+    text = status.read_text(encoding="utf-8")
+    assert "Package: libssl3t64\nStatus: install ok installed\nArchitecture: amd64\nVersion: 3.0.1" in text
+    assert "Package: sudo\nStatus: install ok installed\nArchitecture: all" in text
+
+
+def test_iso_seed_is_safe_by_default():
+    text = (ROOT / "iso" / "user-data").read_text(encoding="utf-8")
+    yaml = pytest.importorskip("yaml")
+    data = yaml.safe_load(text)["autoinstall"]
+    assert data["interactive-sections"] == ["identity"]          # pas de mot de passe codé en dur
+    assert "password:" not in text and "passwd" not in text           # ni mot de passe ni condensat dans l'ISO
+    assert any("install.sh" in str(c) for c in data["late-commands"])
+
+
+def test_ci_seed_is_throwaway_and_never_the_default(tmp_path):
+    seed = tmp_path / "user-data"
+    shutil.copy(ROOT / "iso" / "user-data", seed)
+    subprocess.run(["python3", "-B", str(ROOT / "tools" / "iso_citest.py"), str(seed)], check=True)
+    text = seed.read_text(encoding="utf-8")
+    assert "identity:" in text and "interactive-sections" not in text and "poweroff" in text
+    original = (ROOT / "iso" / "user-data").read_text(encoding="utf-8")
+    assert "identity:" not in original and "poweroff" not in original
+
+
+def test_build_iso_refuses_without_public_key(repo_copy, tmp_path):
+    for pem in (repo_copy / "appliance" / "etc").glob("*.pem"):
+        pem.unlink()
+    result = subprocess.run(["bash", str(repo_copy / "tools" / "build-iso.sh"), "--output", str(tmp_path / "x.iso")],
+                            capture_output=True, text=True, cwd=repo_copy)
+    assert result.returncode != 0
+    assert "clé publique" in result.stderr
+
+
+def test_build_iso_refuses_private_key_as_pubkey(repo_copy, tmp_path):
+    priv = tmp_path / "priv.pem"
+    subprocess.run(["openssl", "genpkey", "-algorithm", "ed25519", "-out", str(priv)], check=True, capture_output=True)
+    result = subprocess.run(["bash", str(repo_copy / "tools" / "build-iso.sh"), "--pubkey", str(priv)],
+                            capture_output=True, text=True, cwd=repo_copy)
+    assert result.returncode != 0
+    assert "n'est pas une clé publique" in result.stderr
+
+
+def test_build_iso_refuses_tampered_base_iso(repo_copy, tmp_path):
+    """Une somme SHA-256 qui ne correspond pas à SHA256SUMS signé doit bloquer la construction."""
+    cache = Path("/home/claude/iso-cache")
+    if not (cache / "SHA256SUMS.gpg").exists():
+        pytest.skip("cache ISO absent")
+    pub = tmp_path / "pub.pem"
+    priv = tmp_path / "priv.pem"
+    subprocess.run(["openssl", "genpkey", "-algorithm", "ed25519", "-out", str(priv)], check=True, capture_output=True)
+    pub.write_bytes(subprocess.run(["openssl", "pkey", "-in", str(priv), "-pubout"], check=True, capture_output=True).stdout)
+    fake = tmp_path / "ubuntu-24.04.5-live-server-amd64.iso"
+    fake.write_bytes(b"pas une iso")
+    shutil.copy(cache / "SHA256SUMS", tmp_path)
+    shutil.copy(cache / "SHA256SUMS.gpg", tmp_path)
+    result = subprocess.run(["bash", str(repo_copy / "tools" / "build-iso.sh"), "--pubkey", str(pub), "--base", str(fake)],
+                            capture_output=True, text=True, cwd=repo_copy, env={**os.environ, "ISO_CACHE": str(tmp_path)})
+    assert result.returncode != 0
+    assert "SHA-256" in result.stderr
+
+
+def test_verify_accepts_a_real_signed_release_without_installing_it(env, repo_copy):
+    publish_real(env, repo_copy, "0.2.0")
+    before = env.current()
+    result = upd.verify_release(env.cfg())
+    assert result["version"] == "0.2.0" and result["signature"] == "valide"
+    assert result["newer_than_current"] is True and result["installable_from_current"] is True
+    assert env.current() == before                                                     # rien n'est installé
+    assert not (env.cfg().releases_dir / "0.2.0").exists()
+
+
+def test_verify_rejects_a_release_signed_with_another_key(env, repo_copy, tmp_path):
+    other = tmp_path / "other"
+    other.mkdir()
+    from conftest import gen_keypair
+    other_priv, _ = gen_keypair(other)
+    publish_real(env, repo_copy, "0.2.0", signed_with=other_priv)
+    with pytest.raises(upd.UpdateError, match="[Ss]ignature"):
+        upd.verify_release(env.cfg())
+
+
+def test_verify_refuses_without_public_key(env, repo_copy):
+    publish_real(env, repo_copy, "0.2.0")
+    cfg = env.cfg()
+    cfg.pubkey.unlink()
+    with pytest.raises(upd.UpdateError, match="Clé publique"):
+        upd.verify_release(cfg)

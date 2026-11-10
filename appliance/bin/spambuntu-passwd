@@ -4,6 +4,9 @@
   spambuntu-passwd                 saisie interactive
   spambuntu-passwd --random        génère un mot de passe aléatoire et l'affiche
   spambuntu-passwd --user NOM      change aussi le nom de l'administrateur
+  --password-file FICHIER          avec --random : écrit le mot de passe dans ce fichier (0600)
+                                   au lieu de l'afficher (installation depuis l'ISO)
+  --secure-cookies                 cookies de session réservés à HTTPS (console servie en HTTPS)
 
 Crée /etc/spambuntu/webui.json s'il n'existe pas. Change la clé de session : les sessions
 ouvertes sont déconnectées.
@@ -28,6 +31,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--random", action="store_true", help="générer un mot de passe aléatoire")
     ap.add_argument("--user", help="nom de l'administrateur (défaut : inchangé, sinon « admin »)")
+    ap.add_argument("--password-file", help="écrire le mot de passe aléatoire dans ce fichier plutôt que l'afficher")
+    ap.add_argument("--secure-cookies", action="store_true", help="cookies de session réservés à HTTPS")
     args = ap.parse_args()
 
     path = Path(os.environ.get("SPAMBUNTU_WEBUI_CONF", "/etc/spambuntu/webui.json"))
@@ -39,6 +44,9 @@ def main() -> int:
         print(f"Configuration illisible ({path}) : {exc}", file=sys.stderr)
         return 1
 
+    if args.password_file and not args.random:
+        print("--password-file s'utilise avec --random.", file=sys.stderr)
+        return 2
     if args.random:
         password = secrets.token_urlsafe(12)
     else:
@@ -53,6 +61,8 @@ def main() -> int:
     conf["admin_user"] = args.user or conf.get("admin_user", "admin")
     conf["password_hash"] = generate_password_hash(password)
     conf["secret_key"] = secrets.token_hex(32)
+    if args.secure_cookies:
+        conf["cookie_secure"] = True
 
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".webui-")
@@ -63,7 +73,15 @@ def main() -> int:
         os.chown(tmp, -1, grp.getgrnam("spambuntu").gr_gid)
     os.replace(tmp, path)
 
-    if args.random:
+    if args.password_file:
+        target = Path(args.password_file)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(f"Console Spambuntu\nIdentifiant : {conf['admin_user']}\nMot de passe : {password}\n"
+                     "Changez-le puis supprimez ce fichier : sudo spambuntu-passwd && sudo rm " + str(target) + "\n")
+        print(f"Mot de passe initial de la console écrit dans {target} (lisible par root uniquement)")
+    elif args.random:
         print(f"Administrateur de la console : {conf['admin_user']}")
         print(f"Mot de passe (à noter, affiché une seule fois) : {password}")
     else:

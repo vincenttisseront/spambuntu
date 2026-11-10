@@ -26,6 +26,7 @@ import os
 import re
 import shlex
 import shutil
+import ssl
 import subprocess
 import sys
 import tarfile
@@ -205,18 +206,21 @@ class Config:
             if urllib.parse.urlparse(url).scheme not in ("http", "https"):
                 raise UpdateError("health_url doit être une URL http(s)")
             return url
-        bind = "127.0.0.1:8080"
+        bind, scheme = "127.0.0.1:8080", "http"
         try:
             for line in (self.config_dir / "webui.env").read_text().splitlines():
                 m = re.match(r"\s*SPAMBUNTU_BIND\s*=\s*(\S+)", line)
                 if m:
                     bind = m.group(1).strip("\"'")
+                m = re.match(r"\s*SPAMBUNTU_TLS_ARGS\s*=(.*)", line)
+                if m:
+                    scheme = "https" if "--certfile" in m.group(1) else "http"
         except OSError:
             pass
         host, _, port = bind.rpartition(":")
         if host in ("", "0.0.0.0", "::", "[::]"):
             host = "127.0.0.1"
-        return f"http://{host}:{port}/healthz"
+        return f"{scheme}://{host}:{port}/healthz"
 
 
 # --------------------------------------------------------------------------- versions installées
@@ -340,7 +344,13 @@ class _DropAuthOnCrossHostRedirect(urllib.request.HTTPRedirectHandler):
 
 
 _OPENER = urllib.request.build_opener(_DropAuthOnCrossHostRedirect())
-_LOCAL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _DropAuthOnCrossHostRedirect())
+# Adresses de boucle locale uniquement (contrôle de santé de la console) : pas de proxy, et le certificat
+# auto-signé de la console est accepté. Aucune vérification n'est relâchée pour un autre hôte.
+_LOCAL_OPENER = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}),
+    urllib.request.HTTPSHandler(context=ssl._create_unverified_context()),  # noqa: S323
+    _DropAuthOnCrossHostRedirect(),
+)
 
 
 def _opener_for(url: str):
@@ -776,6 +786,44 @@ def apply_update(cfg: Config, requested: str | None = None, from_request: bool =
         lock.close()
 
 
+def verify_release(cfg: Config, requested: str | None = None) -> dict:
+    """Contrôle sans rien installer qu'une release publiée est utilisable par cette appliance :
+    elle existe, son archive se télécharge, sa signature correspond à la clé publique installée,
+    l'archive est saine et son manifeste cohérent. N'exige pas les droits root."""
+    if not cfg.pubkey.is_file():
+        raise UpdateError(f"Clé publique de signature absente ({cfg.pubkey}) : aucune mise à jour ne serait acceptée")
+    release = find_release(cfg, requested)
+    if not release:
+        raise UpdateError(f"Version {requested} introuvable" if requested else "Aucune version publiée")
+    version = release["version"]
+    work = Path(tempfile.mkdtemp(prefix="spambuntu-verify-"))
+    try:
+        bundle = work / f"spambuntu-{version}.tar.gz"
+        sig = work / f"{bundle.name}.sig"
+        download(cfg, release["asset_url"], bundle, None, release["size"])
+        download(cfg, release["sig_url"], sig)
+        verify_signature(cfg, bundle, sig)
+        staging = work / "extract"
+        safe_extract(bundle, staging)
+        top = staging / f"spambuntu-{version}"
+        if not top.is_dir():
+            raise UpdateError("Structure d'archive inattendue")
+        manifest = read_manifest(top, version)
+        for required in ("install.sh", "updater/spambuntu_update.py", "hooks/pre-update.sh", "hooks/post-update.sh"):
+            if not (top / required).is_file():
+                raise UpdateError(f"Fichier attendu absent de l'archive : {required}")
+        current = current_version(cfg)
+        min_from = manifest.get("min_from_version")
+        return {
+            "version": version, "current": current, "size": release["size"],
+            "signature": "valide", "min_from_version": min_from,
+            "installable_from_current": not min_from or version_key(current) >= version_key(str(min_from)),
+            "newer_than_current": version_key(version) > version_key(current),
+        }
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def manual_rollback(cfg: Config) -> int:
     require_root(cfg)
     lock = acquire_lock(cfg)
@@ -810,6 +858,9 @@ def main(argv=None) -> int:
     s = sub.add_parser("status", help="afficher l'état")
     s.add_argument("--json", action="store_true")
     sub.add_parser("version", help="afficher la version installée")
+    v = sub.add_parser("verify", help="contrôler (sans installer) qu'une release publiée est utilisable")
+    v.add_argument("--version", help="version précise (défaut : la plus récente du canal)")
+    v.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
     try:
@@ -831,6 +882,14 @@ def main(argv=None) -> int:
             out = {"current": current_version(cfg), "check": read_check(cfg), "apply": read_status(cfg)}
             print(json.dumps(out, ensure_ascii=False, indent=2) if args.json else
                   f"Version installée : {out['current']}\nDernière opération : {(out['apply'] or {}).get('message', 'aucune')}")
+        elif args.cmd == "verify":
+            result = verify_release(cfg, args.version)
+            if args.json:
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+            else:
+                print(f"Release {result['version']} : signature valide, archive saine "
+                      f"({result['size'] // 1024} Ko), installable depuis {result['current']} : "
+                      f"{'oui' if result['installable_from_current'] else 'NON'}")
         elif args.cmd == "apply":
             return apply_update(cfg, args.version, args.from_request, args.force)
         elif args.cmd == "rollback":

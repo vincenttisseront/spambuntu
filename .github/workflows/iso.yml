@@ -1,0 +1,40 @@
+name: ISO
+
+# Construit l'ISO d'installation. Elle dépasse 2 Gio : elle ne peut pas être jointe à une release GitHub,
+# elle est donc publiée comme artefact du workflow (téléchargeable 14 jours).
+on:
+  workflow_dispatch:
+    inputs:
+      ubuntu_iso_version:
+        description: "Version de l'ISO Ubuntu Server 24.04 de base"
+        default: "24.04.5"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  iso:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dépendances
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q xorriso dpkg-dev gnupg curl
+      - name: Construire l'ISO
+        env:
+          UBUNTU_ISO_VERSION: ${{ inputs.ubuntu_iso_version }}
+        run: tools/build-iso.sh --output "$RUNNER_TEMP/out/spambuntu-amd64.iso"
+      - name: Contrôles de l'ISO
+        run: |
+          iso="$RUNNER_TEMP/out/spambuntu-amd64.iso"
+          xorriso -indev "$iso" -ls /spambuntu 2>/dev/null | grep -q "install.sh"
+          xorriso -indev "$iso" -ls /spambuntu-autoinstall 2>/dev/null | grep -q "user-data"
+          xorriso -indev "$iso" -report_el_torito plain 2>/dev/null | grep -E "BIOS|UEFI"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spambuntu-iso
+          path: ${{ runner.temp }}/out/*
+          retention-days: 14
+          compression-level: 0

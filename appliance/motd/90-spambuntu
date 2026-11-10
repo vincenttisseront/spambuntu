@@ -1,0 +1,20 @@
+#!/bin/sh
+# Message affiché à la connexion (installé dans /etc/update-motd.d/ par install.sh)
+[ -d /opt/spambuntu/current ] || exit 0
+version="$(cat /opt/spambuntu/current/VERSION 2>/dev/null || echo '?')"
+bind="127.0.0.1:8080"; scheme="http"
+if [ -r /etc/spambuntu/webui.env ]; then
+    b="$(sed -n 's/^SPAMBUNTU_BIND=//p' /etc/spambuntu/webui.env | tail -n1)"
+    [ -n "$b" ] && bind="$b"
+    grep -q '^SPAMBUNTU_TLS_ARGS=.*--certfile' /etc/spambuntu/webui.env && scheme="https"
+fi
+port="${bind##*:}"
+ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+echo
+echo "  Spambuntu $version"
+echo "  Console : $scheme://${ip:-<adresse-ip>}:$port"
+if [ -f /root/spambuntu-console-password.txt ]; then
+    echo "  Mot de passe initial : sudo cat /root/spambuntu-console-password.txt"
+fi
+echo "  Mises à jour : menu « Mises à jour » de la console, ou sudo spambuntu-update check"
+echo
