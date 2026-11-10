@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Dépendances de test
-        run: pip install flask pytest
+        run: pip install flask pytest pyyaml
       - name: shellcheck
         run: shellcheck -S warning appliance/install.sh appliance/hooks/*.sh tools/*.sh
       - name: Tests
