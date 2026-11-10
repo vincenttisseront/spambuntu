@@ -15,7 +15,7 @@ if "interactive-sections:\n    - identity\n" not in text:
 hash_ = subprocess.run(["openssl", "passwd", "-6", PASSWORD], check=True, capture_output=True, text=True).stdout.strip()
 text = text.replace(
     "interactive-sections:\n    - identity\n",
-    f"identity:\n    hostname: spambuntu\n    username: admin\n    password: '{hash_}'\n",
+    f"identity:\n    hostname: spambuntu\n    username: citest\n    password: '{hash_}'\n",
 )
 checks = [
     "echo SPAMBUNTU-CITEST-BEGIN > /dev/ttyS0",
