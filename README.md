@@ -47,14 +47,14 @@ Disposition sur l'appliance :
 2. **Dépôt privé ?** L'appliance doit alors lire les releases avec un jeton GitHub en lecture
    seule (fine-grained, permission *Contents: Read* sur ce seul dépôt), à placer dans
    `/etc/spambuntu/update.conf` (`token = …` ou `token_file = …`). Un dépôt public n'en a pas besoin.
-3. **Pousser le tag `v0.1.0`** (voir « Publier une version ») : le workflow *Release* publie la
+3. **Pousser le tag `v0.1.1`** (voir « Publier une version ») : le workflow *Release* publie la
    première release signée. Sans elle, une appliance fraîchement installée n'a rien à détecter.
 4. **Générer l'ISO** (voir ci-dessous).
 
 ## Générer l'ISO d'installation
 
 ```bash
-tools/build-iso.sh                  # → dist/spambuntu-0.1.0-amd64.iso (+ .sha256)
+tools/build-iso.sh                  # → dist/spambuntu-0.1.1-amd64.iso (+ .sha256)
 ```
 
 Ou, sans rien installer en local : onglet *Actions* → *ISO* → *Run workflow* (l'ISO, ~4 Go, est un

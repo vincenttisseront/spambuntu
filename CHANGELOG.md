@@ -3,6 +3,11 @@
 Le contenu de la section d'une version est publié comme notes de release et affiché dans la
 console web de l'appliance au moment de proposer la mise à jour.
 
+## [0.1.1] - 2026-11-10
+
+### Corrigé
+- Première release signée (la 0.1.0 n'a jamais été publiée : tests de publication à corriger).
+
 ## [0.1.0] - 2026-11-10
 
 ### Ajouté
