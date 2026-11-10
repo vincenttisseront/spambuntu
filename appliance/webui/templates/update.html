@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Mises à jour · Spambuntu{% endblock %}
+{% block content %}
+<h1>Mises à jour</h1>
+
+<div id="banner" class="banner" hidden role="status"></div>
+
+<section class="card">
+  <h2>Version installée</h2>
+  <dl class="facts">
+    <dt>Version</dt><dd id="current">…</dd>
+    <dt>Dernière vérification</dt><dd id="checked-at">jamais</dd>
+  </dl>
+  <p id="check-error" class="banner error" hidden></p>
+  <div class="actions">
+    <button id="btn-check" type="button">Rechercher des mises à jour</button>
+    <button id="btn-rollback" type="button" class="danger" hidden>Revenir à la version précédente</button>
+  </div>
+</section>
+
+<section class="card" id="latest-card" hidden>
+  <h2>Nouvelle version disponible : <span id="latest-version"></span> <span id="latest-pre" class="tag" hidden>préversion</span></h2>
+  <p class="muted" id="latest-meta"></p>
+  <h3>Nouveautés</h3>
+  <pre id="latest-notes" class="notes"></pre>
+  <p class="muted small">
+    L'installation vérifie la signature de la version, sauvegarde la configuration, puis redémarre la console.
+    Si la nouvelle version ne démarre pas correctement, la version actuelle est rétablie automatiquement.
+  </p>
+  <div class="actions">
+    <button id="btn-apply" type="button" class="primary">Installer cette version</button>
+  </div>
+</section>
+
+<section class="card" id="progress-card" hidden>
+  <h2>Opération <span id="state-label" class="tag"></span></h2>
+  <progress id="progress" max="100" value="0"></progress>
+  <p id="progress-message" class="muted"></p>
+  <details id="log-details">
+    <summary>Journal</summary>
+    <pre id="log" class="log"></pre>
+  </details>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='update.js') }}"></script>
+{% endblock %}

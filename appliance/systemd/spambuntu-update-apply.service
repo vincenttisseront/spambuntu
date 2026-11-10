@@ -1,0 +1,9 @@
+[Unit]
+Description=Spambuntu - installation d'une mise à jour
+# Unité dédiée (et non un processus fils de la console) : l'installation redémarre la console
+# elle-même et doit survivre à ce redémarrage.
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/spambuntu-update apply --from-request
+TimeoutStartSec=30min

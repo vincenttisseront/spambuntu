@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord · Spambuntu{% endblock %}
+{% block content %}
+<h1>Tableau de bord</h1>
+
+{% if check.update_available %}
+  <p class="banner info">
+    La version <strong>{{ check.latest.version }}</strong> est disponible.
+    <a href="{{ url_for('update_page') }}">Voir la mise à jour</a>
+  </p>
+{% endif %}
+
+<section class="card">
+  <h2>Système</h2>
+  <dl class="facts">
+    <dt>Version installée</dt><dd>{{ version }}</dd>
+  </dl>
+</section>
+{% endblock %}

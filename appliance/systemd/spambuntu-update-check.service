@@ -1,0 +1,10 @@
+[Unit]
+Description=Spambuntu - recherche de mises à jour
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=spambuntu
+Group=spambuntu
+ExecStart=/usr/local/sbin/spambuntu-update check

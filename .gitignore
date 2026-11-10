@@ -1,0 +1,8 @@
+dist/
+__pycache__/
+.pytest_cache/
+*.pyc
+# Clés privées : jamais dans le dépôt (seule la clé publique de l'appliance est versionnée)
+*.pem
+!appliance/etc/update-pubkey.pem
+.spambuntu-signing/

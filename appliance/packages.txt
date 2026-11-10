@@ -1,0 +1,8 @@
+# Paquets Ubuntu requis par cette version (un par ligne).
+# Installés par install.sh et par le hook pre-update.sh lors d'une mise à jour.
+python3
+python3-flask
+gunicorn
+openssl
+sudo
+ca-certificates

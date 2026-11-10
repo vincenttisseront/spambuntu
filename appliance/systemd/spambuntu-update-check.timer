@@ -1,0 +1,11 @@
+[Unit]
+Description=Recherche quotidienne de mises à jour Spambuntu
+
+[Timer]
+OnBootSec=10min
+OnCalendar=daily
+RandomizedDelaySec=2h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

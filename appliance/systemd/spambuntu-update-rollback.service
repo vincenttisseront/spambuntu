@@ -1,0 +1,7 @@
+[Unit]
+Description=Spambuntu - retour à la version précédente
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/spambuntu-update rollback
+TimeoutStartSec=10min

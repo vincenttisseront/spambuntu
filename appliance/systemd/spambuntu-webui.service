@@ -1,0 +1,22 @@
+[Unit]
+Description=Spambuntu - console web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=spambuntu
+Group=spambuntu
+WorkingDirectory=/opt/spambuntu/current/webui
+Environment=SPAMBUNTU_BIND=127.0.0.1:8080
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=-/etc/spambuntu/webui.env
+ExecStart=/usr/bin/gunicorn --workers 2 --bind ${SPAMBUNTU_BIND} --access-logfile - "app:create_app()"
+Restart=on-failure
+RestartSec=3
+PrivateTmp=yes
+ProtectHome=yes
+# NoNewPrivileges est volontairement absent : la console lance la mise à jour via sudo (voir sudoers).
+
+[Install]
+WantedBy=multi-user.target

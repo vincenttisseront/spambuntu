@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Définit le mot de passe de l'administrateur de la console web.
+
+  spambuntu-passwd                 saisie interactive
+  spambuntu-passwd --random        génère un mot de passe aléatoire et l'affiche
+  spambuntu-passwd --user NOM      change aussi le nom de l'administrateur
+
+Crée /etc/spambuntu/webui.json s'il n'existe pas. Change la clé de session : les sessions
+ouvertes sont déconnectées.
+"""
+import argparse
+import contextlib
+import getpass
+import grp
+import json
+import os
+import secrets
+import sys
+import tempfile
+from pathlib import Path
+
+from werkzeug.security import generate_password_hash
+
+MIN_LENGTH = 10
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--random", action="store_true", help="générer un mot de passe aléatoire")
+    ap.add_argument("--user", help="nom de l'administrateur (défaut : inchangé, sinon « admin »)")
+    args = ap.parse_args()
+
+    path = Path(os.environ.get("SPAMBUNTU_WEBUI_CONF", "/etc/spambuntu/webui.json"))
+    try:
+        conf = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        conf = {}
+    except (OSError, ValueError) as exc:
+        print(f"Configuration illisible ({path}) : {exc}", file=sys.stderr)
+        return 1
+
+    if args.random:
+        password = secrets.token_urlsafe(12)
+    else:
+        password = getpass.getpass("Nouveau mot de passe : ")
+        if password != getpass.getpass("Confirmation : "):
+            print("Les mots de passe diffèrent.", file=sys.stderr)
+            return 1
+        if len(password) < MIN_LENGTH:
+            print(f"Le mot de passe doit contenir au moins {MIN_LENGTH} caractères.", file=sys.stderr)
+            return 1
+
+    conf["admin_user"] = args.user or conf.get("admin_user", "admin")
+    conf["password_hash"] = generate_password_hash(password)
+    conf["secret_key"] = secrets.token_hex(32)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".webui-")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(conf, fh, indent=2)
+    os.chmod(tmp, 0o640)
+    with contextlib.suppress(KeyError, PermissionError, OSError):
+        os.chown(tmp, -1, grp.getgrnam("spambuntu").gr_gid)
+    os.replace(tmp, path)
+
+    if args.random:
+        print(f"Administrateur de la console : {conf['admin_user']}")
+        print(f"Mot de passe (à noter, affiché une seule fois) : {password}")
+    else:
+        print("Mot de passe mis à jour.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

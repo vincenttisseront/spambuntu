@@ -1,0 +1,72 @@
+name: Release
+
+# Déclenché par un tag vX.Y.Z (créé par tools/release.sh puis « git push --follow-tags »).
+# Construit l'archive, la signe avec le secret UPDATE_SIGNING_KEY et publie la release GitHub.
+# Les appliances détectent ensuite cette release depuis leur console web.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Le tag doit correspondre au fichier VERSION
+        run: |
+          expected="v$(tr -d '[:space:]' < VERSION)"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "Le tag $GITHUB_REF_NAME ne correspond pas à VERSION ($expected)" >&2
+            exit 1
+          fi
+
+      - name: Tests
+        run: |
+          pip install flask pytest
+          python -m pytest -q
+
+      - name: Construire l'archive
+        run: tools/build-bundle.sh dist
+
+      - name: Signer l'archive
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            echo "Le secret UPDATE_SIGNING_KEY n'est pas défini (voir tools/gen-signing-key.sh)" >&2
+            exit 1
+          fi
+          ver="$(tr -d '[:space:]' < VERSION)"
+          bundle="dist/spambuntu-$ver.tar.gz"
+          key="$RUNNER_TEMP/signing-key.pem"
+          (umask 077; printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key")
+          openssl pkeyutl -sign -rawin -inkey "$key" -in "$bundle" -out "$bundle.sig"
+          rm -f "$key"
+          # La signature doit être valide avec la clé publique embarquée dans l'appliance,
+          # sinon aucune appliance n'accepterait cette release.
+          openssl pkeyutl -verify -pubin -inkey appliance/etc/update-pubkey.pem -rawin -in "$bundle" -sigfile "$bundle.sig"
+          (cd dist && sha256sum "spambuntu-$ver.tar.gz" > SHA256SUMS)
+
+      - name: Publier la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ver="$(tr -d '[:space:]' < VERSION)"
+          # Notes = section du CHANGELOG correspondant à la version (affichée dans la console web)
+          notes="$(awk -v v="$ver" '$0 ~ "^## \\[" v "\\]" {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md)"
+          args=()
+          if [[ "$ver" == *-* ]]; then args+=(--prerelease); fi
+          if [ -z "$notes" ]; then args+=(--generate-notes); else args+=(--notes "$notes"); fi
+          gh release create "v$ver" \
+            "dist/spambuntu-$ver.tar.gz" "dist/spambuntu-$ver.tar.gz.sig" dist/SHA256SUMS \
+            --title "Spambuntu $ver" "${args[@]}"

@@ -1,0 +1,29 @@
+# Configuration des mises à jour de Spambuntu (/etc/spambuntu/update.conf)
+# Ce fichier peut contenir un jeton : il doit rester en 0640 root:spambuntu.
+
+[update]
+# Dépôt GitHub qui publie les releases
+repo = vincenttisseront/spambuntu
+
+# stable : releases finales uniquement | beta : inclut les préversions (v1.2.0-rc.1)
+channel = stable
+
+# Dépôt privé : jeton GitHub en lecture seule (fine-grained, permission « Contents: Read »
+# sur ce seul dépôt). Laisser vide si le dépôt est public.
+# token = github_pat_xxxxxxxx
+# ou, mieux, dans un fichier séparé en 0600 :
+# token_file = /etc/spambuntu/github-token
+
+# Clé publique qui valide les signatures des releases (voir tools/gen-signing-key.sh)
+pubkey = /etc/spambuntu/update-pubkey.pem
+
+# Services redémarrés après une mise à jour (séparés par des espaces)
+restart_units = spambuntu-webui.service
+
+# Contrôle de santé après redémarrage. « auto » : déduit de SPAMBUNTU_BIND dans webui.env.
+# Si le service ne répond pas dans le délai, retour arrière automatique. « none » désactive.
+health_url = auto
+health_timeout = 60
+
+# Nombre de versions conservées sur disque (la version active et la précédente comprises)
+keep_releases = 3

@@ -1,0 +1,7 @@
+# Installé par install.sh dans /etc/sudoers.d/spambuntu-webui
+# La console web (utilisateur « spambuntu ») ne peut lancer QUE ces deux unités systemd,
+# sans aucun argument libre. Le travail privilégié est fait par l'unité, pas par la console.
+Cmnd_Alias SPAMBUNTU_UPDATE = \
+    /usr/bin/systemctl start --no-block spambuntu-update-apply.service, \
+    /usr/bin/systemctl start --no-block spambuntu-update-rollback.service
+spambuntu ALL=(root) NOPASSWD: SPAMBUNTU_UPDATE
