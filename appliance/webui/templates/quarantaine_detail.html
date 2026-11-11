@@ -31,6 +31,26 @@
       {% endif %}
     </section>
 
+    {% if m.rule %}
+    <section class="card">
+      <h2>Règle de filtrage appliquée</h2>
+      <dl class="facts">
+        <dt>Règle</dt><dd><a class="rule-link" href="{{ url_for('rule_edit', rule_id=m.rule) }}">{{ m.rule }}</a></dd>
+        {% if m.folder_name %}<dt>Dossier</dt><dd>{{ m.folder_name }}
+          {% if m.folder_access == 'user' %}<span class="muted small">· accessible au destinataire{% if risky %}, mais réservé à l'administrateur à cause du danger détecté{% endif %}</span>
+          {% else %}<span class="muted small">· réservé à l'administrateur</span>{% endif %}</dd>{% endif %}
+      </dl>
+      {% if m.class_scores %}
+      <h3>Scores par classe</h3>
+      <div class="classbars">
+        {% for name, label in classes %}{% set v = m.class_scores.get(name, 0) %}
+        <div class="classbar"><span class="cb-label">{{ label }}</span><progress class="{{ 'hot' if v >= 80 else ('warm' if v >= 50 else '') }}" max="100" value="{{ v }}">{{ v }}</progress><span class="cb-value">{{ v }}</span></div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+    {% endif %}
+
     <section class="card">
       <h2>Règles déclenchées <span class="muted small">({{ weighted | length }} avec effet sur le score)</span></h2>
       {% if weighted %}

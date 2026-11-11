@@ -12,7 +12,7 @@
   <a href="{{ url_for('quarantine_page', **params(vue='tout', page=1)) }}" {% if f.vue == 'tout' %}class="active" aria-current="page"{% endif %}>Tout<span class="count">{{ counts.admin + counts.user }}</span></a>
 </nav>
 
-{% set advanced = f.dest or f.exp or f.motif or f.regle or f.smin is not none or f.smax is not none or f.tri %}
+{% set advanced = f.dest or f.exp or f.motif or f.regle or f.dossier or f.smin is not none or f.smax is not none or f.tri %}
 <form method="get" action="{{ url_for('quarantine_page') }}" class="filters card">
   <input type="hidden" name="vue" value="{{ f.vue }}">
   <div class="filter-main">
@@ -27,6 +27,7 @@
       <label>Destinataire<input name="dest" value="{{ f.dest }}" maxlength="100" placeholder="marie@"></label>
       <label>Expéditeur<input name="exp" value="{{ f.exp }}" maxlength="100" placeholder="domaine ou adresse"></label>
       <label>Motif de risque<select name="motif"><option value="">Tous</option>{% for r in reasons %}<option value="{{ r }}" {% if r|lower == f.motif|lower %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+      <label>Dossier<select name="dossier"><option value="">Tous</option>{% for fid, fname in folder_list %}<option value="{{ fid }}" {% if fid == f.dossier %}selected{% endif %}>{{ fname }}</option>{% endfor %}</select></label>
       <label>Règle déclenchée<input name="regle" value="{{ f.regle }}" maxlength="60" placeholder="R_SPF_FAIL"></label>
       <label>Score minimal<input name="smin" type="number" step="0.5" value="{{ f.smin if f.smin is not none else '' }}"></label>
       <label>Score maximal<input name="smax" type="number" step="0.5" value="{{ f.smax if f.smax is not none else '' }}"></label>
@@ -64,7 +65,7 @@
       {% set risky = m.get('class') != 'user' %}
       <tr class="{{ 'risk-high' if risky else 'risk-ord' }}">
         <td class="chk">{% if not risky %}<input type="checkbox" name="queue_id" value="{{ m.id }}" data-row aria-label="Sélectionner {{ m.subject }}">{% endif %}</td>
-        <td>{% if risky %}<span class="pill risk-high">À examiner</span>{% else %}<span class="pill risk-ord">Ordinaire</span>{% endif %}</td>
+        <td class="col-level">{% if risky %}<span class="pill risk-high">À examiner</span>{% else %}<span class="pill risk-ord">Ordinaire</span>{% endif %}{% if m.folder_name %}<div class="folder-line" title="Dossier {{ m.folder_name }} · règle {{ m.rule }}">{{ m.folder_name }}</div>{% endif %}</td>
         <td class="nowrap num">{{ m.arrived | int | shortdate }}</td>
         <td class="trunc" title="{{ m.from or m.sender }}">{{ m.from or m.sender }}</td>
         <td class="trunc col-to" title="{{ m.recipients | join(', ') }}">{{ m.recipients[0] if m.recipients else '' }}{% if m.recipients|length > 1 %} <span class="muted">+{{ m.recipients|length - 1 }}</span>{% endif %}</td>

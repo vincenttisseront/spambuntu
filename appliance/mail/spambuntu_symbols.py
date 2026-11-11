@@ -102,3 +102,8 @@ def describe(name: str) -> tuple:
         if pattern.search(name):
             return info
     return ("Autre", "")
+
+
+def known_names() -> list:
+    """Noms de règles décrits, pour la saisie assistée des conditions « Règle Rspamd déclenchée »."""
+    return sorted(_EXACT)

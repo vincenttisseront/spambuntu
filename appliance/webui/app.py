@@ -29,6 +29,7 @@ import spambuntu_ai as aicfg  # noqa: E402
 import spambuntu_digest as digest  # noqa: E402
 import spambuntu_mail as mailcfg  # noqa: E402
 import spambuntu_quarantine as quarantine  # noqa: E402
+import spambuntu_rules as rulescfg  # noqa: E402
 import spambuntu_symbols as symdoc  # noqa: E402
 import listing  # noqa: E402
 import spambuntu_update as upd  # noqa: E402
@@ -163,7 +164,6 @@ def parse_mail_form(form) -> dict:
         "identity_enabled": form.get("identity_enabled") == "on",
         "vip": vip,
         "brand_domains": brands,
-        "dmarc_action": form.get("dmarc_action") or "reject",
     }
 
 
@@ -324,14 +324,16 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
             category = ""
         f = {"q": listing.text_arg(request.args, "q"), "sender": listing.text_arg(request.args, "sender"),
              "rcpt": listing.text_arg(request.args, "rcpt"), "ip": listing.text_arg(request.args, "ip", 45),
-             "symbol": listing.text_arg(request.args, "regle", 60), "smin": listing.number_arg(request.args, "smin"),
+             "symbol": listing.text_arg(request.args, "regle", 60), "filtre": listing.text_arg(request.args, "filtre", 40), "smin": listing.number_arg(request.args, "smin"),
              "smax": listing.number_arg(request.args, "smax"), "action": category, "hours": hours, "page": listing.page_arg(request.args)}
         error = None
         for key in ("q", "sender", "rcpt", "ip", "symbol"):
             if f[key] and not JOURNAL_QUERY_RE.fullmatch(f[key]):
                 error, f[key] = "Recherche invalide : lettres, chiffres et @ . + - : uniquement.", ""
+        if f["filtre"] and not rulescfg.RULE_ID_RE.fullmatch(f["filtre"]):
+            f["filtre"] = ""
         args = ["search", "--hours", hours, "--limit", "500"]
-        for key, flag in (("q", "--q"), ("sender", "--sender"), ("rcpt", "--rcpt"), ("ip", "--ip"), ("symbol", "--symbol"), ("action", "--action")):
+        for key, flag in (("q", "--q"), ("sender", "--sender"), ("rcpt", "--rcpt"), ("ip", "--ip"), ("symbol", "--symbol"), ("filtre", "--rule"), ("action", "--action")):
             if f[key]:
                 args += [flag, f[key]]
         for key, flag in (("smin", "--min-score"), ("smax", "--max-score")):
@@ -344,7 +346,8 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         defaults = {"hours": "24", "page": 1}
         keep = lambda **over: {k: v for k, v in {**f, **over}.items() if v not in (None, "") and defaults.get(k) != v}  # noqa: E731
         return render_template("journal.html", active="journal", records=records, error=error, f=f, pager=pager, keep=keep,
-                               categories=JOURNAL_CATEGORIES, windows=STATS_WINDOWS)
+                               categories=JOURNAL_CATEGORIES, windows=STATS_WINDOWS,
+                               rule_ids=[r["id"] for r in working_config()["rules"]])
 
     @app.get("/journal/trace")
     @login_required
@@ -358,7 +361,7 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         for verdict in verdicts:
             for sym in verdict.get("sym_all", []):
                 sym["category"], sym["text"] = symdoc.describe(sym["name"])
-        return render_template("journal_trace.html", active="journal", ident=ident, error=error, verdicts=verdicts,
+        return render_template("journal_trace.html", active="journal", ident=ident, error=error, verdicts=verdicts, classes=rulescfg.CLASSES,
                                delivery=result.get("delivery", []) if not error else [])
 
     @app.get("/system/update")
@@ -393,23 +396,229 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
                                vip_text="\n".join(f"{v['name']} ; {v['address']}" for v in current["vip"]),
                                brands_text="\n".join(current["brand_domains"]), builtin_brands=mailcfg.BUILTIN_BRANDS)
 
-    @app.post("/messagerie")
-    @login_required
-    def mail_save():
+    def working_config() -> dict:
+        """Configuration de départ d'une modification : la demande encore en attente si elle existe (deux clics rapides ne
+        doivent pas s'écraser), sinon la configuration appliquée. Toujours revalidée."""
+        pending = upd.read_json(mail_state_dir() / "mail-request.json", None)
+        if pending is not None:
+            try:
+                return mailcfg.validate(pending)
+            except mailcfg.MailError:
+                pass
         try:
-            new = mailcfg.validate(parse_mail_form(request.form))
-        except mailcfg.MailError as exc:
-            flash("error", f"Configuration refusée : {exc}")
-            return redirect(url_for("mail_page"))
+            return mailcfg.load_config(Path(app.config["MAIL_CONF"]))
+        except mailcfg.MailError:
+            return mailcfg.validate({})
+
+    def submit_mail_config(new: dict, success: str) -> bool:
         request_file = mail_state_dir() / "mail-request.json"
         upd.write_json_atomic(request_file, new)
         ok, message = app.config["UNIT_STARTER"](MAIL_UNIT)
         if not ok:
             request_file.unlink(missing_ok=True)
             flash("error", f"Impossible d'appliquer la configuration : {message}")
-        else:
-            flash("success", "Configuration envoyée : application en cours…")
+            return False
+        flash("success", success)
+        return True
+
+    @app.post("/messagerie")
+    @login_required
+    def mail_save():
+        try:
+            raw = parse_mail_form(request.form)
+            base = working_config()
+            raw["rules"], raw["lists"] = base["rules"], base["lists"]          # le formulaire ne les contient pas : on les conserve
+            new = mailcfg.validate(raw)
+        except mailcfg.MailError as exc:
+            flash("error", f"Configuration refusée : {exc}")
+            return redirect(url_for("mail_page"))
+        submit_mail_config(new, "Configuration envoyée : application en cours…")
         return redirect(url_for("mail_page"))
+
+    # ------------------------------------------------------------------ règles de filtrage
+
+    def rules_view_state() -> dict:
+        status = upd.read_json(mail_state_dir() / "mail-status.json", None)
+        return {"pending": (mail_state_dir() / "mail-request.json").exists(), "status": status}
+
+    def change_rules(change, success: str) -> bool:
+        """Applique `change(règles) -> règles` à la configuration de départ, valide l'ensemble, puis dépose la demande."""
+        base = working_config()
+        try:
+            new = mailcfg.validate({**base, "rules": change(base["rules"])})
+        except (rulescfg.RulesError, mailcfg.MailError) as exc:
+            flash("error", f"Modification refusée : {exc}")
+            return False
+        return submit_mail_config(new, success)
+
+    @app.get("/regles")
+    @login_required
+    def rules_page():
+        base = working_config()
+        stats = app.config["STATS_RUNNER"](["summary", "--hours", "24"])
+        hits = stats.get("rule_hits", {}) if stats.get("ok") else None
+        rules = base["rules"]
+        rows = [{"rule": r, "conditions": rulescfg.describe_conditions(r), "actions": rulescfg.describe_actions(r),
+                 "cond_lines": [rulescfg.describe_condition(c) for c in r["conditions"]], "joiner": "ET" if r["match"] == "all" else "OU",
+                 "hits": None if hits is None else hits.get(r["id"], 0), "protected": r["id"] in rulescfg.PROTECTED,
+                 "last": r["id"] == rulescfg.LAST_RULE, "first": i == 0, "bottom": i == len(rules) - 2}
+                for i, r in enumerate(rules)]
+        lists = base["lists"]
+        return render_template("regles.html", active="rules", rows=rows, hits_known=hits is not None,
+                               quarantine_enabled=base["quarantine_enabled"], counts={"block": len(lists["block"]), "safe": len(lists["safe"])},
+                               **rules_view_state())
+
+    def parse_rule_form(form, original_id: str | None) -> dict:
+        """Formulaire -> règle brute. La validation stricte est faite par spambuntu_rules."""
+        locked = rulescfg.LOCKED_CONDITIONS.get(original_id or "")
+        conditions = []
+        for n in range(rulescfg.MAX_CONDITIONS):
+            field = (form.get(f"cond_field_{n}") or "").strip()
+            if not field:
+                continue
+            op, value = (form.get(f"cond_op_{n}") or "").strip(), (form.get(f"cond_value_{n}") or "").strip()
+            if op in ("is:true", "is:false"):
+                op, value = "is", op.endswith("true")
+            conditions.append({"field": field, "op": op, "value": value})
+        headers = []
+        for n in range(rulescfg.MAX_HEADERS):
+            name, value = (form.get(f"hdr_name_{n}") or "").strip(), (form.get(f"hdr_value_{n}") or "").strip()
+            if name or value:
+                headers.append({"name": name, "value": value})
+        return {
+            "id": original_id if original_id in rulescfg.PROTECTED else (form.get("id") or "").strip(),
+            "enabled": form.get("enabled") == "on" or original_id == rulescfg.LAST_RULE,
+            "description": form.get("description") or "", "match": form.get("match") or "all",
+            "conditions": [dict(c) for c in locked] if locked else conditions,
+            "disposition": form.get("disposition") or "", "folder": form.get("folder") or "",
+            "user_access": form.get("user_access") == "on", "headers": headers, "explain": form.get("explain") == "on",
+        }
+
+    def form_condition(cond: dict) -> dict:
+        """Condition validée ou brute -> valeurs des champs du formulaire."""
+        op, value = cond.get("op", ""), cond.get("value", "")
+        if op == "is":
+            op, value = f"is:{'true' if value is True else 'false'}", ""
+        return {"field": cond.get("field", ""), "op": op, "value": value}
+
+    def rule_form_page(rule: dict, original_id: str | None, error: str | None = None, status: int = 200):
+        base = working_config()
+        locked = original_id in rulescfg.LOCKED_CONDITIONS
+        conditions = [form_condition(c) for c in rule.get("conditions", [])] or [{"field": "spam", "op": ">=", "value": 50}]
+        allowed = rulescfg.LOCKED_DISPOSITIONS.get(original_id or "")
+        dispositions = [(k, v) for k, v in rulescfg.DISPOSITIONS.items() if not allowed or k in allowed]
+        slots = lambda items, count, blank: (list(items) + [blank] * count)[:count]  # noqa: E731
+        page = render_template(
+            "regle_edit.html", active="rules", rule=rule, original_id=original_id, error=error, locked=locked,
+            protected=original_id in rulescfg.PROTECTED, always_on=original_id == rulescfg.LAST_RULE,
+            conditions=slots(conditions, rulescfg.MAX_CONDITIONS, {"field": "", "op": "", "value": ""}),
+            headers=slots(rule.get("headers", []), rulescfg.MAX_HEADERS, {"name": "", "value": ""}),
+            fields=[(k, rulescfg.FIELD_SHORT[k], v["type"]) for k, v in rulescfg.FIELDS.items()],
+            dispositions=dispositions, known_folders=[f["name"] for f in rulescfg.folders(base["rules"])],
+            known_symbols=symdoc.known_names(), quarantine_enabled=base["quarantine_enabled"],
+            description_text=rulescfg.describe_conditions(rule) if locked and rule.get("conditions") else "")
+        response = app.make_response((page, status))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.get("/regles/nouvelle")
+    @login_required
+    def rule_new():
+        rule = {"id": "", "enabled": True, "description": "", "match": "all", "conditions": [{"field": "spam", "op": ">=", "value": 50}],
+                "disposition": "quarantine", "folder": "", "user_access": False, "headers": [], "explain": True}
+        return rule_form_page(rule, None)
+
+    @app.post("/regles/nouvelle")
+    @login_required
+    def rule_create():
+        raw = parse_rule_form(request.form, None)
+        base = working_config()
+        try:
+            rule = rulescfg.validate_rule(raw)
+            new = mailcfg.validate({**base, "rules": rulescfg.upsert(base["rules"], rule, None)})
+        except (rulescfg.RulesError, mailcfg.MailError) as exc:
+            return rule_form_page(raw, None, str(exc), 422)
+        if submit_mail_config(new, f"Règle « {rule['id']} » ajoutée : application en cours…"):
+            warnings = rulescfg.rule_warnings(rule)
+            if warnings:
+                flash("warning", f"Règle « {rule['id']} » ajoutée. Attention : {' '.join(warnings)}")
+        return redirect(url_for("rules_page"))
+
+    @app.get("/regles/<rule_id>/modifier")
+    @login_required
+    def rule_edit(rule_id):
+        rule = next((r for r in working_config()["rules"] if r["id"] == rule_id), None)
+        if rule is None:
+            abort(404)
+        return rule_form_page(rule, rule_id)
+
+    @app.post("/regles/<rule_id>/modifier")
+    @login_required
+    def rule_update(rule_id):
+        base = working_config()
+        if not any(r["id"] == rule_id for r in base["rules"]):
+            abort(404)
+        raw = parse_rule_form(request.form, rule_id)
+        try:
+            rule = rulescfg.validate_rule(raw)
+            new = mailcfg.validate({**base, "rules": rulescfg.upsert(base["rules"], rule, rule_id)})
+        except (rulescfg.RulesError, mailcfg.MailError) as exc:
+            return rule_form_page(raw, rule_id, str(exc), 422)
+        if submit_mail_config(new, f"Règle « {rule['id']} » enregistrée : application en cours…"):
+            warnings = rulescfg.rule_warnings(rule)
+            if warnings:
+                flash("warning", f"Règle « {rule['id']} » enregistrée. Attention : {' '.join(warnings)}")
+        return redirect(url_for("rules_page"))
+
+    @app.post("/regles/<rule_id>/<action>")
+    @login_required
+    def rule_action(rule_id, action):
+        if action not in ("activer", "monter", "descendre", "cloner", "supprimer") or not rulescfg.RULE_ID_RE.fullmatch(rule_id):
+            abort(404)
+        if action == "cloner":
+            created = []
+
+            def do_clone(rules):
+                new_rules, new_id = rulescfg.clone(rules, rule_id)
+                created.append(new_id)
+                return new_rules
+            if change_rules(do_clone, "Règle clonée (désactivée) : modifiez-la puis activez-la."):
+                return redirect(url_for("rule_edit", rule_id=created[0]))
+        elif action == "activer":
+            change_rules(lambda rules: rulescfg.toggle(rules, rule_id), "Règle mise à jour : application en cours…")
+        elif action in ("monter", "descendre"):
+            change_rules(lambda rules: rulescfg.move(rules, rule_id, -1 if action == "monter" else 1), "Ordre modifié : application en cours…")
+        else:
+            change_rules(lambda rules: rulescfg.delete(rules, rule_id), f"Règle « {rule_id} » supprimée : application en cours…")
+        return redirect(url_for("rules_page"))
+
+    def parse_list(text: str) -> list:
+        entries = []
+        for line in (text or "").replace(",", "\n").replace(";", "\n").splitlines():
+            line = line.split("#", 1)[0].strip()
+            if line:
+                entries.append(line)
+        return entries
+
+    @app.get("/regles/listes")
+    @login_required
+    def rules_lists():
+        lists = working_config()["lists"]
+        return render_template("regles_listes.html", active="rules", block_text="\n".join(lists["block"]), safe_text="\n".join(lists["safe"]),
+                               max_entries=rulescfg.MAX_LIST, **rules_view_state())
+
+    @app.post("/regles/listes")
+    @login_required
+    def rules_lists_save():
+        base = working_config()
+        try:
+            lists = rulescfg.validate_lists({"block": parse_list(request.form.get("block")), "safe": parse_list(request.form.get("safe"))})
+            new = mailcfg.validate({**base, "lists": lists})
+        except (rulescfg.RulesError, mailcfg.MailError) as exc:
+            flash("error", f"Listes refusées : {exc}")
+            return redirect(url_for("rules_lists"))
+        submit_mail_config(new, "Listes enregistrées : application en cours…")
+        return redirect(url_for("rules_lists"))
 
     def digest_page(status: int, **ctx):
         response = app.make_response((render_template("digest.html", **ctx), status))
@@ -562,13 +771,15 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         result = app.config["QUARANTINE_RUNNER"](["list"])
         if not result.get("ok"):
             return render_template("quarantaine.html", messages=[], error=result.get("error"), counts={"admin": 0, "user": 0},
-                                   pager=listing.paginate([], 1)[1], reasons=[], **base)
+                                   pager=listing.paginate([], 1)[1], reasons=[], folder_list=[], **base)
         everything = result.get("messages", [])
         counts = {"admin": sum(1 for m in everything if m.get("class") != "user"),
                   "user": sum(1 for m in everything if m.get("class") == "user")}
         reasons = sorted({d for m in everything for d in m.get("danger", [])})
+        folder_list = sorted({(m.get("folder"), m.get("folder_name") or m.get("folder")) for m in everything if m.get("folder")}, key=lambda x: x[1].lower())
         page_items, pager = listing.paginate(listing.filter_quarantine(everything, f), f["page"])
-        return render_template("quarantaine.html", messages=page_items, error=None, counts=counts, pager=pager, reasons=reasons, **base)
+        return render_template("quarantaine.html", messages=page_items, error=None, counts=counts, pager=pager, reasons=reasons,
+                               folder_list=folder_list, **base)
 
     @app.get("/quarantaine/message/<queue_id>")
     @login_required
@@ -586,7 +797,7 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
             category, text = symdoc.describe(sym["name"])
             rows.append({**sym, "category": category, "text": text})
         th = mail_thresholds()
-        return render_template("quarantaine_detail.html", active="quarantine", m=m, th=th, gauge=listing.gauge(m.get("score"), th),
+        return render_template("quarantaine_detail.html", active="quarantine", m=m, th=th, gauge=listing.gauge(m.get("score"), th), classes=rulescfg.CLASSES,
                                weighted=[r for r in rows if r["score"] != 0], neutral=[r for r in rows if r["score"] == 0],
                                f=f, back=listing.url_params(f))
 

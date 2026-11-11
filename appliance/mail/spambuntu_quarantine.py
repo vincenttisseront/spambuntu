@@ -24,11 +24,14 @@ import email.header
 import email.policy
 import html.parser
 import json
+import os
 import re
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))     # exécuté avec python3 -I
 
 LOG_FILE = Path("/var/log/spambuntu/quarantine.log")
 FEEDBACK_FILE = Path("/var/lib/spambuntu/mail/feedback.jsonl")
@@ -95,6 +98,39 @@ def ai_explanation(spamd_result: str) -> str:
     return re.sub(r"\s+", " ", m.group(2)).strip()[:200] if m else ""
 
 
+RULE_RE = re.compile(r"SPAMBUNTU_RULE\(-?\d+(?:\.\d+)?\)\[([^\]]*)\]")
+RULE_ID_RE = re.compile(r"[a-z][a-z0-9_]{2,39}")
+FOLDER_ID_RE = re.compile(r"[a-z0-9_]{1,30}")
+
+
+def rule_of(spamd_result: str) -> dict:
+    """Règle de filtrage appliquée au message (symbole SPAMBUNTU_RULE) : {"id", "folder", "access", "scores"} ou {}.
+    Options : identifiant, dossier (« - » sans quarantaine), accès (user/admin), puis un score par classe (« phish:80 »)."""
+    m = RULE_RE.search(spamd_result or "")
+    if not m:
+        return {}
+    opts = [o.strip() for o in m.group(1).split(",")]
+    if len(opts) < 3 or not RULE_ID_RE.fullmatch(opts[0]):
+        return {}
+    scores = {}
+    for opt in opts[3:]:
+        name, _, value = opt.partition(":")
+        if name in ("spam", "malware", "phish", "impostor", "bulk") and value.isdigit() and int(value) <= 100:
+            scores[name] = int(value)
+    return {"id": opts[0], "folder": opts[1] if FOLDER_ID_RE.fullmatch(opts[1]) else "",
+            "access": opts[2] if opts[2] in ("user", "admin") else "", "scores": scores}
+
+
+def folder_names() -> dict:
+    """{identifiant de dossier: nom affiché}, d'après les règles configurées (vide si la configuration est illisible)."""
+    try:
+        import spambuntu_mail as mailcfg
+        import spambuntu_rules as rulescfg
+        return {f["id"]: f["name"] for f in rulescfg.folders(mailcfg.load_config()["rules"])}
+    except Exception:       # noqa: BLE001 - un nom de dossier absent ne doit jamais empêcher de lister la quarantaine
+        return {}
+
+
 DANGER_SCORE = 12.0
 AI_DANGER = {  # drapeaux de l'analyse IA qui rendent un message « admin », avec leur libellé
     "phishing": "Hameçonnage", "bec": "Fraude au président ou à la facture", "malware_lure": "Leurre de logiciel malveillant",
@@ -112,8 +148,10 @@ DANGER_SYMBOLS = (  # (motif de règle Rspamd, libellé)
 )
 
 
-def classify(symbols: list, ai_flags: list, score) -> tuple:
-    """(classe, motifs) : « admin » dès qu'un signal de danger est présent ou que l'analyse est incomplète."""
+def classify(symbols: list, ai_flags: list, score, rule: dict | None = None, names: dict | None = None) -> tuple:
+    """(classe, motifs) : « admin » dès qu'un signal de danger est présent ou que l'analyse est incomplète.
+    Une règle peut seulement RESTREINDRE : un dossier « administrateur » rend le message « admin », mais un dossier
+    accessible à l'utilisateur ne retire jamais un signal de danger."""
     reasons = [AI_DANGER[f] for f in ai_flags if f in AI_DANGER]
     for pattern, label in DANGER_SYMBOLS:
         if any(pattern.search(sym) for sym in symbols):
@@ -122,6 +160,8 @@ def classify(symbols: list, ai_flags: list, score) -> tuple:
         reasons.append("Analyse impossible")
     elif score >= DANGER_SCORE:
         reasons.append("Score très élevé")
+    if not reasons and rule and rule.get("access") == "admin" and rule.get("folder"):
+        reasons.append(f"Dossier « {(names or {}).get(rule['folder'], rule['folder'])} » réservé à l'administrateur")
     reasons = list(dict.fromkeys(reasons))
     return ("admin" if reasons else "user"), reasons
 
@@ -145,14 +185,17 @@ def held(run=_run, limit: int = MAX_LIST) -> list:
 
 def listing(run=_run, limit: int = MAX_LIST) -> list:
     out = []
+    names = folder_names()
     for d in held(run, limit):
         head = run(["postcat", "-qh", d["queue_id"]])
         h = headers_of(head.stdout[:HEADER_BYTES]) if head.returncode == 0 else {}
         every = symbols_of(h.get("x-spamd-result", ""), 200)
         flags = [x[len("SPAMBUNTU_AI_"):].lower() for x in every if x.startswith("SPAMBUNTU_AI_")]
-        cls, reasons = classify(every, flags, score_of(h.get("x-spamd-result", "")))
+        rule = rule_of(h.get("x-spamd-result", ""))
+        cls, reasons = classify(every, flags, score_of(h.get("x-spamd-result", "")), rule, names)
         out.append({
             "class": cls, "danger": reasons,
+            "rule": rule.get("id", ""), "folder": rule.get("folder", ""), "folder_name": names.get(rule.get("folder", ""), rule.get("folder", "")),
             "id": d["queue_id"],
             "sender": str(d.get("sender", ""))[:200],
             "recipients": [str(r.get("address", ""))[:200] for r in d.get("recipients", [])][:20],
@@ -161,7 +204,7 @@ def listing(run=_run, limit: int = MAX_LIST) -> list:
             "subject": decode_header(h.get("subject", "")),
             "from": decode_header(h.get("from", "")),
             "score": score_of(h.get("x-spamd-result", "")),
-            "symbols": [s for s in symbols_of(h.get("x-spamd-result", "")) if not s.startswith("SPAMBUNTU_AI")],
+            "symbols": [s for s in symbols_of(h.get("x-spamd-result", ""), 14) if not s.startswith(("SPAMBUNTU_AI", "SPAMBUNTU_RULE"))][:12],
             "ai": ai_explanation(h.get("x-spamd-result", "")),
             "ai_flags": flags,
         })
@@ -279,7 +322,9 @@ def show(queue_id: str, run=_run) -> dict:
     every = symbols_of(spamd, 200)
     flags = [x[len("SPAMBUNTU_AI_"):].lower() for x in every if x.startswith("SPAMBUNTU_AI_")]
     score = score_of(spamd)
-    cls, reasons = classify(every, flags, score)
+    rule = rule_of(spamd)
+    names = folder_names()
+    cls, reasons = classify(every, flags, score, rule, names)
     limit = re.search(r"\[-?\d+(?:\.\d+)? / (\d+(?:\.\d+)?)\]", spamd)
     parsed = email.message_from_bytes(raw_head)
     header = lambda name, n=300: decode_header(str(parsed.get(name, "")), n)  # noqa: E731
@@ -296,7 +341,9 @@ def show(queue_id: str, run=_run) -> dict:
         "size": size, "arrived": int(item.get("arrival_time", 0)),
         "headers": {"from": header("from"), "to": header("to"), "reply_to": header("reply-to"), "subject": header("subject"),
                     "date": header("date", 80), "message_id": header("message-id", 200), "return_path": header("return-path", 200)},
-        "symbols": spamd_symbols(spamd), "ai": ai_explanation(spamd), "ai_flags": flags,
+        "symbols": [x for x in spamd_symbols(spamd) if x["name"] != "SPAMBUNTU_RULE"], "ai": ai_explanation(spamd), "ai_flags": flags,
+        "rule": rule.get("id", ""), "folder": rule.get("folder", ""), "folder_name": names.get(rule.get("folder", ""), rule.get("folder", "")),
+        "folder_access": rule.get("access", ""), "class_scores": rule.get("scores", {}),
         "preview": preview,
     }
 
@@ -311,7 +358,8 @@ def show_for_user(queue_id: str, recipient: str, run=_run, max_score=None) -> di
     fields = headers_of(head.stdout[:HEADER_BYTES]) if head.returncode == 0 else {}
     score = score_of(fields.get("x-spamd-result", ""))
     every = symbols_of(fields.get("x-spamd-result", ""), 200)
-    cls, _ = classify(every, [x[len("SPAMBUNTU_AI_"):].lower() for x in every if x.startswith("SPAMBUNTU_AI_")], score)
+    cls, _ = classify(every, [x[len("SPAMBUNTU_AI_"):].lower() for x in every if x.startswith("SPAMBUNTU_AI_")], score,
+                      rule_of(fields.get("x-spamd-result", "")))
     if recipient.lower() not in recipients or cls != "user" or (max_score is not None and (score is None or score > max_score)):
         raise QuarantineError("Ce message n'est pas accessible depuis votre espace")
     size = int(item.get("message_size", 0))
@@ -373,7 +421,8 @@ def act(action: str, queue_id: str, actor: str = "console", run=_run, log_file: 
     fields = headers_of(head.stdout[:HEADER_BYTES]) if head.returncode == 0 else {}
     score = score_of(fields.get("x-spamd-result", ""))
     every = symbols_of(fields.get("x-spamd-result", ""), 200)
-    cls, _ = classify(every, [x[len("SPAMBUNTU_AI_"):].lower() for x in every if x.startswith("SPAMBUNTU_AI_")], score)
+    cls, _ = classify(every, [x[len("SPAMBUNTU_AI_"):].lower() for x in every if x.startswith("SPAMBUNTU_AI_")], score,
+                      rule_of(fields.get("x-spamd-result", "")))
     if recipient:
         recipients = {str(r.get("address", "")).lower() for r in item.get("recipients", [])}
         if recipient.lower() not in recipients:

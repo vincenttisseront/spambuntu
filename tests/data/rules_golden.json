@@ -1,0 +1,9275 @@
+{
+ "signals": {
+  "malware": [
+   {
+    "kind": "contains",
+    "name": "VIRUS",
+    "points": 100
+   },
+   {
+    "kind": "contains",
+    "name": "MALWARE",
+    "points": 100
+   },
+   {
+    "kind": "contains",
+    "name": "TROJAN",
+    "points": 100
+   },
+   {
+    "kind": "contains",
+    "name": "RANSOM",
+    "points": 100
+   },
+   {
+    "kind": "contains",
+    "name": "EXPLOIT",
+    "points": 100
+   },
+   {
+    "kind": "exact",
+    "name": "MIME_DOUBLE_BAD_EXTENSION",
+    "points": 60
+   },
+   {
+    "kind": "exact",
+    "name": "MIME_BAD_EXTENSION",
+    "points": 40
+   },
+   {
+    "kind": "exact",
+    "name": "MIME_ARCHIVE_IN_ARCHIVE",
+    "points": 40
+   },
+   {
+    "kind": "exact",
+    "name": "MIME_ENCRYPTED_ARCHIVE",
+    "points": 40
+   },
+   {
+    "kind": "exact",
+    "name": "MIME_OBFUSCATED_ARCHIVE",
+    "points": 40
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_AI_MALWARE_LURE",
+    "points": 60
+   }
+  ],
+  "phish": [
+   {
+    "kind": "contains",
+    "name": "PHISH",
+    "points": 100
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_AI_PHISHING",
+    "points": 85
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_AI_CREDENTIALS",
+    "points": 60
+   },
+   {
+    "kind": "exact",
+    "name": "SEM_URIBL_FRESH15",
+    "points": 30
+   },
+   {
+    "kind": "exact",
+    "name": "HTML_META_REFRESH_URL",
+    "points": 20
+   }
+  ],
+  "impostor": [
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_VIP_SPOOF",
+    "points": 100
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_LOOKALIKE",
+    "points": 90
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_IDN_HOMOGLYPH",
+    "points": 90
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_BRAND_IN_DOMAIN",
+    "points": 40
+   },
+   {
+    "kind": "exact",
+    "name": "SPOOF_DISPLAY_NAME",
+    "points": 60
+   },
+   {
+    "kind": "exact",
+    "name": "DMARC_POLICY_REJECT",
+    "points": 60
+   },
+   {
+    "kind": "exact",
+    "name": "SPOOF_REPLYTO",
+    "points": 50
+   },
+   {
+    "kind": "exact",
+    "name": "FORGED_SENDER",
+    "points": 30
+   },
+   {
+    "kind": "exact",
+    "name": "FROM_NEQ_DISPLAY_NAME",
+    "points": 30
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_AI_IMPERSONATION",
+    "points": 80
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_AI_BEC",
+    "points": 90
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_AI_INVOICE_CHANGE",
+    "points": 70
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_AI_GIFT_CARDS",
+    "points": 70
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_AI_SCAM",
+    "points": 60
+   },
+   {
+    "kind": "exact",
+    "name": "SPAMBUNTU_AI_PAYMENT",
+    "points": 40
+   }
+  ],
+  "bulk": [
+   {
+    "kind": "exact",
+    "name": "MAILLIST",
+    "points": 60
+   },
+   {
+    "kind": "exact",
+    "name": "PRECEDENCE_BULK",
+    "points": 60
+   },
+   {
+    "kind": "exact",
+    "name": "BULK_HEADER",
+    "points": 60
+   },
+   {
+    "kind": "exact",
+    "name": "HAS_LIST_UNSUB",
+    "points": 40
+   }
+  ]
+ },
+ "thresholds": {
+  "tag": 5.0,
+  "quarantine": 8.0,
+  "reject": 15.0
+ },
+ "cases": [
+  {
+   "name": "courrier propre",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [],
+    "raw": 0.4,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 2,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_notspam",
+    "matched": [
+     "inbound_notspam"
+    ]
+   }
+  },
+  {
+   "name": "marquage",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [],
+    "raw": 6.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 33,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_junk",
+    "matched": [
+     "inbound_junk"
+    ]
+   }
+  },
+  {
+   "name": "quarantaine spam",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [],
+    "raw": 9.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 57,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_spam",
+    "matched": [
+     "inbound_spam"
+    ]
+   }
+  },
+  {
+   "name": "rejet spam certain",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [],
+    "raw": 20.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 100,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_spam_definite",
+    "matched": [
+     "inbound_spam_definite"
+    ]
+   }
+  },
+  {
+   "name": "hameconnage connu",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "PHISHED_OPENPHISH"
+    ],
+    "raw": 3.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 15,
+     "malware": 0,
+     "phish": 100,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_phish",
+    "matched": [
+     "inbound_phish"
+    ]
+   }
+  },
+  {
+   "name": "virus",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "CLAM_VIRUS"
+    ],
+    "raw": 2.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 10,
+     "malware": 100,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_malware",
+    "matched": [
+     "inbound_malware"
+    ]
+   }
+  },
+  {
+   "name": "double extension",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "MIME_DOUBLE_BAD_EXTENSION"
+    ],
+    "raw": 2.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 10,
+     "malware": 60,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_malware",
+    "matched": [
+     "inbound_malware"
+    ]
+   }
+  },
+  {
+   "name": "extension seule",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "MIME_BAD_EXTENSION"
+    ],
+    "raw": 2.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 10,
+     "malware": 40,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_notspam",
+    "matched": [
+     "inbound_notspam"
+    ]
+   }
+  },
+  {
+   "name": "usurpation dirigeant",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "SPAMBUNTU_VIP_SPOOF"
+    ],
+    "raw": 8.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 50,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 100,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_impostor",
+    "matched": [
+     "inbound_impostor"
+    ]
+   }
+  },
+  {
+   "name": "marque dans domaine",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "SPAMBUNTU_BRAND_IN_DOMAIN"
+    ],
+    "raw": 2.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 10,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 40,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_notspam",
+    "matched": [
+     "inbound_notspam"
+    ]
+   }
+  },
+  {
+   "name": "dmarc reject",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "DMARC_POLICY_REJECT"
+    ],
+    "raw": 6.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 33,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 60,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_dmarc",
+    "matched": [
+     "inbound_dmarc"
+    ]
+   }
+  },
+  {
+   "name": "ia hameconnage",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "SPAMBUNTU_AI",
+     "SPAMBUNTU_AI_PHISHING"
+    ],
+    "raw": 6.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 33,
+     "malware": 0,
+     "phish": 100,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_phish",
+    "matched": [
+     "inbound_phish"
+    ]
+   }
+  },
+  {
+   "name": "ia bec",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "SPAMBUNTU_AI_BEC"
+    ],
+    "raw": 6.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 33,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 90,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_impostor",
+    "matched": [
+     "inbound_impostor"
+    ]
+   }
+  },
+  {
+   "name": "liste noire adresse",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [],
+    "raw": 0.4,
+    "mime_from": "pirate@evil.test",
+    "env_from": "pirate@evil.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 2,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": true,
+    "safelist": false,
+    "final": "inbound_blocked",
+    "matched": [
+     "inbound_blocked"
+    ]
+   }
+  },
+  {
+   "name": "liste noire domaine parent",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [],
+    "raw": 0.4,
+    "mime_from": "x@a.b.evil.test",
+    "env_from": "x@a.b.evil.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 2,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": true,
+    "safelist": false,
+    "final": "inbound_blocked",
+    "matched": [
+     "inbound_blocked"
+    ]
+   }
+  },
+  {
+   "name": "liste noire enveloppe",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [],
+    "raw": 0.4,
+    "mime_from": "client@autre.test",
+    "env_from": "bounce@evil.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 2,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": true,
+    "safelist": false,
+    "final": "inbound_blocked",
+    "matched": [
+     "inbound_blocked"
+    ]
+   }
+  },
+  {
+   "name": "liste noire reseau ipv4",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [],
+    "raw": 0.4,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "198.51.100.77"
+   },
+   "expected": {
+    "scores": {
+     "spam": 2,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": true,
+    "safelist": false,
+    "final": "inbound_blocked",
+    "matched": [
+     "inbound_blocked"
+    ]
+   }
+  },
+  {
+   "name": "liste noire reseau ipv6",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [],
+    "raw": 0.4,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "2001:db8:bad::99"
+   },
+   "expected": {
+    "scores": {
+     "spam": 2,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": true,
+    "safelist": false,
+    "final": "inbound_blocked",
+    "matched": [
+     "inbound_blocked"
+    ]
+   }
+  },
+  {
+   "name": "hors liste noire",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [],
+    "raw": 0.4,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "198.51.101.1"
+   },
+   "expected": {
+    "scores": {
+     "spam": 2,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_notspam",
+    "matched": [
+     "inbound_notspam"
+    ]
+   }
+  },
+  {
+   "name": "liste sure sans authentification",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [],
+    "raw": 20.0,
+    "mime_from": "x@partenaire.test",
+    "env_from": "x@partenaire.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 100,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_spam_definite",
+    "matched": [
+     "inbound_spam_definite"
+    ]
+   }
+  },
+  {
+   "name": "liste sure avec dmarc",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [
+     "DMARC_POLICY_ALLOW"
+    ],
+    "raw": 20.0,
+    "mime_from": "x@partenaire.test",
+    "env_from": "x@partenaire.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 100,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": true,
+    "final": "inbound_safe",
+    "matched": [
+     "inbound_safe"
+    ]
+   }
+  },
+  {
+   "name": "liste sure spf aligne",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [
+     "R_SPF_ALLOW"
+    ],
+    "raw": 9.0,
+    "mime_from": "x@partenaire.test",
+    "env_from": "bounce@mail.partenaire.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 57,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": true,
+    "final": "inbound_safe",
+    "matched": [
+     "inbound_safe"
+    ]
+   }
+  },
+  {
+   "name": "liste sure spf non aligne",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [
+     "R_SPF_ALLOW"
+    ],
+    "raw": 9.0,
+    "mime_from": "x@partenaire.test",
+    "env_from": "bounce@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 57,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_spam",
+    "matched": [
+     "inbound_spam"
+    ]
+   }
+  },
+  {
+   "name": "liste sure adresse",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [
+     "DMARC_POLICY_ALLOW"
+    ],
+    "raw": 9.0,
+    "mime_from": "ceo@vip.test",
+    "env_from": "ceo@vip.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 57,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": true,
+    "final": "inbound_safe",
+    "matched": [
+     "inbound_safe"
+    ]
+   }
+  },
+  {
+   "name": "liste sure ip",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [],
+    "raw": 9.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "192.0.2.10"
+   },
+   "expected": {
+    "scores": {
+     "spam": 57,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": true,
+    "final": "inbound_safe",
+    "matched": [
+     "inbound_safe"
+    ]
+   }
+  },
+  {
+   "name": "liste sure ipv6",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [],
+    "raw": 9.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "2001:db8:5afe::1"
+   },
+   "expected": {
+    "scores": {
+     "spam": 57,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": true,
+    "final": "inbound_safe",
+    "matched": [
+     "inbound_safe"
+    ]
+   }
+  },
+  {
+   "name": "hameconnage prime sur liste sure",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [
+     "pirate@evil.test",
+     "evil.test",
+     "198.51.100.0/24",
+     "2001:db8:bad::/48"
+    ],
+    "safe": [
+     "partenaire.test",
+     "ceo@vip.test",
+     "192.0.2.10",
+     "2001:db8:5afe::1"
+    ]
+   },
+   "input": {
+    "symbols": [
+     "DMARC_POLICY_ALLOW",
+     "PHISHED_OPENPHISH"
+    ],
+    "raw": 0.4,
+    "mime_from": "x@partenaire.test",
+    "env_from": "x@partenaire.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 2,
+     "malware": 0,
+     "phish": 100,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": true,
+    "final": "inbound_phish",
+    "matched": [
+     "inbound_phish"
+    ]
+   }
+  },
+  {
+   "name": "en masse desactive",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "MAILLIST",
+     "HAS_LIST_UNSUB"
+    ],
+    "raw": 1.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 5,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 100
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_notspam",
+    "matched": [
+     "inbound_notspam"
+    ]
+   }
+  },
+  {
+   "name": "symbole contient trojan",
+   "rules": [
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": false,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": false,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "HEUR_TROJAN_DROPPER"
+    ],
+    "raw": 1.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 5,
+     "malware": 100,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_malware",
+    "matched": [
+     "inbound_malware"
+    ]
+   }
+  },
+  {
+   "name": "regles personnalisees : courrier propre",
+   "rules": [
+    {
+     "id": "custom_any",
+     "enabled": true,
+     "description": "Expéditeur suspect",
+     "match": "any",
+     "conditions": [
+      {
+       "field": "sender",
+       "op": "ends_with",
+       "value": ".xyz"
+      },
+      {
+       "field": "score",
+       "op": "<=",
+       "value": -1
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "custom_finance",
+     "enabled": true,
+     "description": "Courrier à la comptabilité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "recipient",
+       "op": "equals",
+       "value": "compta@exemple.fr"
+      },
+      {
+       "field": "symbol",
+       "op": "present",
+       "value": "R_SPF_FAIL"
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Finance",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": true,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": true,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [],
+    "raw": 0.4,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 2,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_notspam",
+    "matched": [
+     "inbound_notspam"
+    ]
+   }
+  },
+  {
+   "name": "regles personnalisees : en masse",
+   "rules": [
+    {
+     "id": "custom_any",
+     "enabled": true,
+     "description": "Expéditeur suspect",
+     "match": "any",
+     "conditions": [
+      {
+       "field": "sender",
+       "op": "ends_with",
+       "value": ".xyz"
+      },
+      {
+       "field": "score",
+       "op": "<=",
+       "value": -1
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "custom_finance",
+     "enabled": true,
+     "description": "Courrier à la comptabilité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "recipient",
+       "op": "equals",
+       "value": "compta@exemple.fr"
+      },
+      {
+       "field": "symbol",
+       "op": "present",
+       "value": "R_SPF_FAIL"
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Finance",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": true,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": true,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "MAILLIST",
+     "HAS_LIST_UNSUB"
+    ],
+    "raw": 1.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 5,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 100
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "inbound_bulk",
+    "matched": [
+     "inbound_lowpriority",
+     "inbound_bulk"
+    ]
+   }
+  },
+  {
+   "name": "regles personnalisees : finance",
+   "rules": [
+    {
+     "id": "custom_any",
+     "enabled": true,
+     "description": "Expéditeur suspect",
+     "match": "any",
+     "conditions": [
+      {
+       "field": "sender",
+       "op": "ends_with",
+       "value": ".xyz"
+      },
+      {
+       "field": "score",
+       "op": "<=",
+       "value": -1
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "custom_finance",
+     "enabled": true,
+     "description": "Courrier à la comptabilité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "recipient",
+       "op": "equals",
+       "value": "compta@exemple.fr"
+      },
+      {
+       "field": "symbol",
+       "op": "present",
+       "value": "R_SPF_FAIL"
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Finance",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": true,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": true,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [
+     "R_SPF_FAIL"
+    ],
+    "raw": 2.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 10,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "custom_finance",
+    "matched": [
+     "custom_finance"
+    ]
+   }
+  },
+  {
+   "name": "regles personnalisees : expediteur .xyz",
+   "rules": [
+    {
+     "id": "custom_any",
+     "enabled": true,
+     "description": "Expéditeur suspect",
+     "match": "any",
+     "conditions": [
+      {
+       "field": "sender",
+       "op": "ends_with",
+       "value": ".xyz"
+      },
+      {
+       "field": "score",
+       "op": "<=",
+       "value": -1
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "custom_finance",
+     "enabled": true,
+     "description": "Courrier à la comptabilité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "recipient",
+       "op": "equals",
+       "value": "compta@exemple.fr"
+      },
+      {
+       "field": "symbol",
+       "op": "present",
+       "value": "R_SPF_FAIL"
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Finance",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": true,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": true,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [],
+    "raw": 0.4,
+    "mime_from": "a@promo.xyz",
+    "env_from": "a@promo.xyz",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 2,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "custom_any",
+    "matched": [
+     "custom_any"
+    ]
+   }
+  },
+  {
+   "name": "regles personnalisees : score negatif",
+   "rules": [
+    {
+     "id": "custom_any",
+     "enabled": true,
+     "description": "Expéditeur suspect",
+     "match": "any",
+     "conditions": [
+      {
+       "field": "sender",
+       "op": "ends_with",
+       "value": ".xyz"
+      },
+      {
+       "field": "score",
+       "op": "<=",
+       "value": -1
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "custom_finance",
+     "enabled": true,
+     "description": "Courrier à la comptabilité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "recipient",
+       "op": "equals",
+       "value": "compta@exemple.fr"
+      },
+      {
+       "field": "symbol",
+       "op": "present",
+       "value": "R_SPF_FAIL"
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Finance",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_blocked",
+     "enabled": true,
+     "description": "Liste de blocage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "blocklist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_malware",
+     "enabled": true,
+     "description": "Logiciel malveillant ou pièce jointe dangereuse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "malware",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Malware",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_impostor",
+     "enabled": true,
+     "description": "Usurpation d'identité et fraude",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "impostor",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Usurpation",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_phish",
+     "enabled": true,
+     "description": "Hameçonnage",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "phish",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Hameçonnage",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_safe",
+     "enabled": true,
+     "description": "Liste sûre",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "safelist",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_dmarc",
+     "enabled": true,
+     "description": "Échec DMARC (politique « reject » de l'expéditeur)",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "dmarc_reject",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam_definite",
+     "enabled": true,
+     "description": "Spam certain",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 100
+      }
+     ],
+     "disposition": "reject",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_spam",
+     "enabled": true,
+     "description": "Spam mis en quarantaine",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 50
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Spam",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_junk",
+     "enabled": true,
+     "description": "Courrier indésirable probable",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 25
+      }
+     ],
+     "disposition": "tag",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_lowpriority",
+     "enabled": true,
+     "description": "Faible priorité",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "continue",
+     "folder": "",
+     "user_access": false,
+     "headers": [
+      {
+       "name": "X-Spambuntu-Tag",
+       "value": "lowpriority"
+      }
+     ],
+     "explain": true
+    },
+    {
+     "id": "inbound_bulk",
+     "enabled": true,
+     "description": "Courrier en masse",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "bulk",
+       "op": ">=",
+       "value": 80
+      }
+     ],
+     "disposition": "quarantine",
+     "folder": "Courrier en masse",
+     "user_access": true,
+     "headers": [],
+     "explain": true
+    },
+    {
+     "id": "inbound_notspam",
+     "enabled": true,
+     "description": "Courrier légitime",
+     "match": "all",
+     "conditions": [
+      {
+       "field": "spam",
+       "op": ">=",
+       "value": 0
+      }
+     ],
+     "disposition": "deliver",
+     "folder": "",
+     "user_access": false,
+     "headers": [],
+     "explain": true
+    }
+   ],
+   "lists": {
+    "block": [],
+    "safe": []
+   },
+   "input": {
+    "symbols": [],
+    "raw": -3.0,
+    "mime_from": "client@autre.test",
+    "env_from": "client@autre.test",
+    "rcpts": [
+     "compta@exemple.fr"
+    ],
+    "ip": "203.0.113.9"
+   },
+   "expected": {
+    "scores": {
+     "spam": 0,
+     "malware": 0,
+     "phish": 0,
+     "impostor": 0,
+     "bulk": 0
+    },
+    "blocklist": false,
+    "safelist": false,
+    "final": "custom_any",
+    "matched": [
+     "custom_any"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Règles de filtrage · Spambuntu{% endblock %}
+{% block content %}
+<h1>Règles de filtrage</h1>
+
+{% if pending %}<div class="banner warning" role="status">Une configuration est en cours d'application…</div>
+{% elif status %}
+<div class="banner {{ 'success' if status.ok else 'error' }}" role="status">
+  Dernière application ({{ status.at }}) : {{ status.message }}
+</div>
+{% endif %}
+
+<p class="muted hint">Chaque message reçu est comparé aux règles <strong>dans l'ordre</strong> ; la première règle qui s'applique décide de son sort.
+  Une règle « Poursuivre » n'ajoute que des en-têtes. Les règles fournies (cadenas) se modifient mais ne se suppriment pas, et « inbound_notspam »
+  reste toujours en dernier : elle livre ce qu'aucune autre règle n'a retenu.</p>
+
+<div class="toolbar-row">
+  <a class="btn primary" href="{{ url_for('rule_new') }}">{{ icon('plus') }}Ajouter une règle</a>
+  <a class="btn" href="{{ url_for('rules_lists') }}">{{ icon('ban') }}Listes de blocage et sûre<span class="count">{{ counts.block + counts.safe }}</span></a>
+  <span class="spacer"></span>
+  <span class="muted small">{{ rows|length }} règles · déclenchements sur 24 h{% if not hits_known %} indisponibles{% endif %}</span>
+</div>
+
+{% if not quarantine_enabled %}
+<div class="banner warning" role="status">La quarantaine est désactivée (page Messagerie) : les règles « Mettre en quarantaine » marquent le message à la place.</div>
+{% endif %}
+
+<section class="card tablecard">
+  <div class="scroll">
+  <table class="list rules-table">
+    <thead><tr>
+      <th class="sw">Active</th><th>Classification</th><th>Condition</th><th>Action</th><th class="ord">Ordre</th><th class="r">24 h</th><th class="act"></th>
+    </tr></thead>
+    <tbody>
+    {% for row in rows %}{% set r = row.rule %}
+      <tr class="{{ 'is-off' if not r.enabled }}">
+        <td class="sw">
+          {% if row.last %}<span class="switch on fixed" title="Toujours active">{{ icon('lock') }}</span>
+          {% else %}
+          <form method="post" action="{{ url_for('rule_action', rule_id=r.id, action='activer') }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="switch {{ 'on' if r.enabled }}" role="switch" aria-checked="{{ 'true' if r.enabled else 'false' }}"
+                    aria-label="{{ 'Désactiver' if r.enabled else 'Activer' }} la règle {{ r.id }}" title="{{ 'Désactiver' if r.enabled else 'Activer' }}"><span class="knob"></span></button>
+          </form>
+          {% endif %}
+        </td>
+        <td class="what">
+          <a class="rule-id" href="{{ url_for('rule_edit', rule_id=r.id) }}">{{ r.id }}</a>{% if row.protected %}<span class="lock" title="Règle fournie : modifiable, non supprimable">{{ icon('lock') }}</span>{% endif %}
+          <div class="muted small">{{ r.description }}</div>
+        </td>
+        <td class="cond">
+          {% for line in row.cond_lines %}{% if not loop.first %}<div class="joiner">{{ row.joiner }}</div>{% endif %}<div>{{ line }}</div>{% endfor %}
+        </td>
+        <td class="actionlist">
+          <span class="pill {{ {'deliver': 'cat-delivered', 'tag': 'cat-tagged', 'quarantine': 'cat-quarantined', 'reject': 'cat-rejected', 'continue': 'fam'}[r.disposition] }}">
+            {{ {'deliver': 'Livrer', 'tag': 'Marquer', 'quarantine': 'Quarantaine', 'reject': 'Rejeter', 'continue': 'Poursuivre'}[r.disposition] }}</span>
+          <ul class="bullets">{% for line in row.actions %}<li>{{ line }}</li>{% endfor %}</ul>
+        </td>
+        <td class="ord">
+          {% if not row.last %}
+          <form method="post" action="{{ url_for('rule_action', rule_id=r.id, action='monter') }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="icon-btn" aria-label="Monter la règle {{ r.id }}" title="Monter" {% if row.first %}disabled{% endif %}>{{ icon('arrow-up') }}</button>
+          </form>
+          <form method="post" action="{{ url_for('rule_action', rule_id=r.id, action='descendre') }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="icon-btn" aria-label="Descendre la règle {{ r.id }}" title="Descendre" {% if row.bottom %}disabled{% endif %}>{{ icon('arrow-down') }}</button>
+          </form>
+          {% else %}<span class="muted small">dernière</span>{% endif %}
+        </td>
+        <td class="r nowrap">{% if row.hits is none %}<span class="muted">–</span>{% elif row.hits %}<strong>{{ row.hits }}</strong>{% else %}<span class="muted">0</span>{% endif %}</td>
+        <td class="act nowrap">
+          <a class="btn icon-btn" href="{{ url_for('rule_edit', rule_id=r.id) }}" title="Modifier" aria-label="Modifier la règle {{ r.id }}">{{ icon('pencil') }}</a>
+          {% if not row.last %}
+          <form method="post" action="{{ url_for('rule_action', rule_id=r.id, action='cloner') }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="icon-btn" title="Cloner" aria-label="Cloner la règle {{ r.id }}">{{ icon('copy') }}</button>
+          </form>
+          {% endif %}
+          {% if not row.protected %}
+          <form method="post" action="{{ url_for('rule_action', rule_id=r.id, action='supprimer') }}" class="inline" data-confirm="Supprimer la règle {{ r.id }} ?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="icon-btn danger" title="Supprimer" aria-label="Supprimer la règle {{ r.id }}">{{ icon('trash') }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<p class="muted small">Les scores de classe vont de 0 à 100 : « spam » se déduit des seuils de la page Messagerie (marquage = 25, quarantaine = 50, rejet = 100) ;
+  les autres classes additionnent des signaux (pièces jointes à risque, hameçonnage, usurpation, courrier en masse). Chaque règle
+  retenue ajoute l'en-tête <code>X-Spambuntu-Rule</code> au message, pour le retrouver dans la quarantaine et le journal.</p>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='rules.js') }}"></script>{% endblock %}

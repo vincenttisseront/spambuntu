@@ -37,7 +37,7 @@ def quarantine_filters(args) -> dict:
     return {
         "vue": view if view in QUARANTINE_VIEWS else "risque",
         "q": text_arg(args, "q"), "dest": text_arg(args, "dest"), "exp": text_arg(args, "exp"),
-        "motif": text_arg(args, "motif", 80), "regle": text_arg(args, "regle", 60).upper(),
+        "motif": text_arg(args, "motif", 80), "regle": text_arg(args, "regle", 60).upper(), "dossier": text_arg(args, "dossier", 40).lower(),
         "smin": number_arg(args, "smin"), "smax": number_arg(args, "smax"),
         "periode": period if period in PERIODS else "tout",
         "tri": sort if sort in dict(QUARANTINE_SORTS) else "",
@@ -54,7 +54,7 @@ def url_params(filters: dict, **over) -> dict:
 
 def filter_quarantine(messages: list, f: dict, now: float | None = None) -> list:
     now = now or time.time()
-    needle, dest, exp, motif, regle = (f[k].lower() for k in ("q", "dest", "exp", "motif", "regle"))
+    needle, dest, exp, motif, regle, dossier = (f[k].lower() for k in ("q", "dest", "exp", "motif", "regle", "dossier"))
     horizon = PERIODS.get(f["periode"])
     out = []
     for m in messages:
@@ -70,6 +70,8 @@ def filter_quarantine(messages: list, f: dict, now: float | None = None) -> list
         if motif and motif not in [d.lower() for d in m.get("danger", [])]:
             continue
         if regle and not any(regle.lower() in s.lower() for s in m.get("symbols", [])):
+            continue
+        if dossier and m.get("folder", "") != dossier:
             continue
         score = m.get("score")
         if f["smin"] is not None and (score is None or score < f["smin"]):

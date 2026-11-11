@@ -216,12 +216,16 @@ install_mail() {
 }
 
 install_identity() {
-    # Règles Rspamd de protection d'identité (fichiers gérés par Spambuntu, configuration rendue par spambuntu-mail).
+    # Règles Rspamd de protection d'identité et moteur de règles de filtrage (fichiers gérés par Spambuntu ;
+    # la configuration est rendue par spambuntu-mail). Le moteur de règles passe en dernier : il lit les résultats des autres.
     [ -z "$D" ] || return 0
     install -d -m 0755 /etc/rspamd/spambuntu
-    install -m 0644 "$SRC/mail/rspamd/identity_lib.lua" /etc/rspamd/spambuntu/identity_lib.lua
-    install -m 0644 "$SRC/mail/rspamd/spambuntu_identity.lua" /etc/rspamd/spambuntu/spambuntu_identity.lua
-    printf '%s\n' '-- Géré par Spambuntu : ne pas modifier' 'dofile("/etc/rspamd/spambuntu/spambuntu_identity.lua")' > /etc/rspamd/rspamd.local.lua
+    for lua in identity_lib spambuntu_identity rules_lib spambuntu_rules; do
+        install -m 0644 "$SRC/mail/rspamd/$lua.lua" "/etc/rspamd/spambuntu/$lua.lua"
+    done
+    printf '%s\n' '-- Géré par Spambuntu : ne pas modifier' \
+        'dofile("/etc/rspamd/spambuntu/spambuntu_identity.lua")' \
+        'dofile("/etc/rspamd/spambuntu/spambuntu_rules.lua")' > /etc/rspamd/rspamd.local.lua
     chmod 0644 /etc/rspamd/rspamd.local.lua
 }
 

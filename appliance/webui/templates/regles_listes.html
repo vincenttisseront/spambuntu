@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Listes de blocage et sûre · Spambuntu{% endblock %}
+{% block content %}
+<p class="back"><a class="btn" href="{{ url_for('rules_page') }}">{{ icon('arrow-left') }}Règles de filtrage</a></p>
+<h1>Listes de blocage et sûre</h1>
+
+{% if pending %}<div class="banner warning" role="status">Une configuration est en cours d'application…</div>
+{% elif status %}
+<div class="banner {{ 'success' if status.ok else 'error' }}" role="status">
+  Dernière application ({{ status.at }}) : {{ status.message }}
+</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('rules_lists_save') }}" class="card form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <p class="muted small">Une entrée par ligne : une adresse (<code>facturation@fournisseur.fr</code>), un domaine avec ses sous-domaines
+    (<code>fournisseur.fr</code>) ou une adresse / un réseau IP (<code>203.0.113.0/24</code>). Les lignes commençant par <code>#</code> sont ignorées.
+    Maximum {{ max_entries }} entrées par liste. Ces listes sont utilisées par les règles <code>inbound_blocked</code> et <code>inbound_safe</code>.</p>
+  <div class="lists-grid">
+    <div>
+      <h2>Liste de blocage</h2>
+      <textarea name="block" rows="12" spellcheck="false" autocomplete="off" aria-label="Liste de blocage" placeholder="pourriel.example&#10;203.0.113.0/24">{{ block_text }}</textarea>
+      <p class="muted small">Un expéditeur de cette liste est refusé (règle <code>inbound_blocked</code>), sans autre contrôle. Le domaine de l'adresse
+        d'enveloppe et celui de l'en-tête « From » sont comparés ; l'adresse IP du serveur émetteur aussi.</p>
+    </div>
+    <div>
+      <h2>Liste sûre</h2>
+      <textarea name="safe" rows="12" spellcheck="false" autocomplete="off" aria-label="Liste sûre" placeholder="partenaire.fr&#10;compta@client.fr">{{ safe_text }}</textarea>
+      <p class="muted small"><strong>Un expéditeur sûr doit être authentifié</strong> : son message n'est livré sans analyse que si SPF aligné ou DMARC est
+        validé, sinon une simple usurpation de son adresse contournerait le filtre. Une adresse IP ou un réseau de cette liste est digne de confiance sans
+        condition (un serveur de votre partenaire, par exemple).</p>
+    </div>
+  </div>
+  <div class="actions"><button type="submit" class="primary">Enregistrer les listes</button><a class="btn" href="{{ url_for('rules_page') }}">Retour aux règles</a></div>
+</form>
+{% endblock %}

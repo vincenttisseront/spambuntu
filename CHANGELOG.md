@@ -32,7 +32,23 @@ console web de l'appliance au moment de proposer la mise à jour.
   changement d'extension) de vos domaines et d'une liste de marques extensible, alphabets mélangés (homoglyphes,
   punycode), nom de marque dans un autre domaine, courrier composé d'images seules. Une heuristique d'identité
   ne fait jamais rejeter un message à elle seule : il est retenu pour l'administrateur.
-- Réglage « Action en cas d'échec DMARC » (rejet, quarantaine, points seulement) sur la page Messagerie.
+- Gestion des règles de filtrage (page « Règles », tableau façon Proofpoint) : liste ordonnée où la première règle
+  qui s'applique décide du sort du message. Chaque règle a une classification, une description, des conditions
+  (scores de classe spam / logiciel malveillant / hameçonnage / usurpation et fraude / courrier en masse de 0 à
+  100, score Rspamd, liste de blocage ou sûre, échec DMARC « reject », règle Rspamd déclenchée, expéditeur,
+  destinataire ; « toutes » ou « une des » conditions) et une action (livrer, marquer, mettre en quarantaine
+  dans un dossier, rejeter, ou poursuivre en ajoutant des en-têtes). Activer / désactiver, monter / descendre,
+  ajouter, modifier, cloner, supprimer ; nombre de déclenchements sur 24 h. Règles fournies : liste de
+  blocage, logiciel malveillant, usurpation, hameçonnage, liste sûre, DMARC, spam certain / en quarantaine /
+  probable, courrier en masse, faible priorité ; « inbound_notspam » reste toujours la dernière.
+- Dossiers de quarantaine définis par les règles, réservés à l'administrateur ou accessibles au destinataire (un
+  message dangereux reste réservé à l'administrateur quel que soit le dossier). Dossier, règle appliquée et
+  scores par classe affichés dans la quarantaine (colonne, filtre, vue d'analyse) et dans le journal (colonne,
+  filtre « Règle de filtrage », parcours).
+- Listes de blocage et sûre (adresses, domaines, réseaux IP) : la liste sûre n'a d'effet que pour un expéditeur
+  authentifié (SPF aligné ou DMARC) ou une adresse IP de confiance.
+- En-têtes `X-Spambuntu-Rule` et `X-Spambuntu-Scores` ajoutés aux messages livrés ou retenus ; ceux envoyés par
+  l'expéditeur sont supprimés. En-têtes `X-…` personnalisés par règle.
 - Listes compactes (une ligne par message) avec filtres : quarantaine (expéditeur, destinataire, objet, motif de
   risque, règle, score, période, tri), journal (expéditeur, destinataire, IP, règle, score, résultat, période)
   et espace « Mes messages » (recherche, période) ; pagination ; actions en lot sur le courrier ordinaire.
@@ -49,7 +65,11 @@ console web de l'appliance au moment de proposer la mise à jour.
   Code couleur : rouge = réservé à l'administrateur, bleu = courrier ordinaire gérable, orange = attention.
 - Comportement : un message dont l'expéditeur publie une politique DMARC « reject » et échoue à l'authentification
   est désormais rejeté au SMTP (conforme à la politique du domaine). Pour le retenir en quarantaine à la place,
-  choisissez « Quarantaine » dans « Action en cas d'échec DMARC ».
+  modifiez la règle `inbound_dmarc` dans la page « Règles ».
+- Les seuils de la page « Messagerie » restent la base du score de spam des règles (marquage = 25, quarantaine = 50,
+  rejet = 100) ; les actions se règlent désormais dans la page « Règles ».
+- Limites connues : pas d'action « supprimer sans notification » (Rspamd 3.8 ne la gère pas : utiliser le rejet),
+  pas de listes personnelles par utilisateur, pas de détection antivirus ni de bac à sable.
 
 ## [0.2.0] - 2026-11-11
 

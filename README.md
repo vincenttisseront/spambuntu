@@ -99,6 +99,16 @@ Dans la console : **Messagerie** (domaines et serveur de destination, seuils, r�
 rien tant que vous n'en avez pas ajouté (jamais de relais ouvert). Si Rspamd est indisponible, les messages
 sont différés (jamais livrés sans analyse).
 
+### Règles de filtrage (0.3.0)
+
+La page **Règles** de la console est une liste ordonnée, à la manière des tableaux de règles des passerelles
+professionnelles : *classification*, *description*, *condition*, *action*, ordre (flèches), activation, modification,
+clonage, suppression. La première règle qui s'applique décide ; une règle « Poursuivre » ajoute seulement des en-têtes.
+Les conditions portent sur cinq scores de classe de 0 à 100 (spam, logiciel malveillant, hameçonnage, usurpation et
+fraude, courrier en masse), le score Rspamd, les listes de blocage et sûre, DMARC, une règle Rspamd précise,
+l'expéditeur ou un destinataire. Les actions : livrer, marquer, mettre en quarantaine dans un dossier (réservé à
+l'administrateur ou accessible au destinataire), rejeter. Voir `docs/regles-antispam.md`.
+
 Choix de conception :
 - La console ne modifie rien dans `/etc` : elle dépose une demande que `spambuntu-mail-apply.service`
   (root) **revalide** avant d'écrire la configuration de Postfix et de Rspamd. Si Postfix ou Rspamd la
@@ -109,7 +119,7 @@ Choix de conception :
 - Le greylisting de Rspamd est désactivé (il retarde le premier message de tout nouvel expéditeur).
 
 Pas encore couvert : certificat TLS de confiance pour la passerelle (le certificat auto-signé suffit pour
-STARTTLS entre serveurs), signature DKIM sortante, résumé quotidien de quarantaine.
+STARTTLS entre serveurs), signature DKIM sortante.
 
 ## Publier une version
 

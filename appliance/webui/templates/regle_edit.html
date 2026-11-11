@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set creating = original_id is none %}
+{% block title %}{{ 'Nouvelle règle' if creating else 'Règle ' ~ original_id }} · Spambuntu{% endblock %}
+{% block content %}
+{% set OPS = [('>=', 'number', '≥ (au moins)'), ('<=', 'number', '≤ (au plus)'), ('is:true', 'bool', 'oui'), ('is:false', 'bool', 'non'),
+              ('present', 'symbol', 'est déclenchée'), ('absent', 'symbol', "n'est pas déclenchée"),
+              ('contains', 'text', 'contient'), ('equals', 'text', 'est égale à'), ('ends_with', 'text', 'se termine par')] %}
+<p class="back"><a class="btn" href="{{ url_for('rules_page') }}">{{ icon('arrow-left') }}Règles de filtrage</a></p>
+<h1>{% if creating %}Nouvelle règle{% else %}Règle <code>{{ original_id }}</code>{% endif %}</h1>
+
+{% if error %}<div class="banner error" role="alert">{{ error }}</div>{% endif %}
+
+<form method="post" action="{{ url_for('rule_create') if creating else url_for('rule_update', rule_id=original_id) }}" class="card form rule-form" data-rule-form>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  <h2>Identification</h2>
+  <div class="grid">
+    <label>Classification
+      <input name="id" value="{{ rule.id }}" maxlength="40" pattern="[a-z][a-z0-9_]{2,39}" required spellcheck="false" autocomplete="off"
+             placeholder="inbound_facture" {% if protected %}readonly{% endif %}></label>
+    <label>Description
+      <input name="description" value="{{ rule.description }}" maxlength="80" required autocomplete="off" placeholder="Courrier de facturation douteux"></label>
+  </div>
+  <p class="muted small">La classification est l'identifiant technique de la règle : minuscules, chiffres et <code>_</code>. Elle apparaît dans
+    l'en-tête <code>X-Spambuntu-Rule</code>, dans la quarantaine et dans le journal.
+    {% if protected %}Cette règle est fournie avec l'appliance : sa classification ne change pas.{% endif %}</p>
+  {% if always_on %}
+  <p class="muted small">Cette règle est toujours active et toujours la dernière : elle livre tout ce qu'aucune autre règle n'a retenu.</p>
+  {% else %}
+  <label class="check"><input type="checkbox" name="enabled" {% if rule.enabled %}checked{% endif %}> Règle active</label>
+  {% endif %}
+
+  <h2>Condition</h2>
+  {% if locked %}
+  <div class="locked-conds">
+    {{ description_text }}
+    <div class="muted small">{{ icon('lock') }} Cette condition est liée à la règle fournie et ne se modifie pas
+      {%- if original_id == 'inbound_blocked' %} : elle s'appuie sur la <a href="{{ url_for('rules_lists') }}">liste de blocage</a>
+      {%- elif original_id == 'inbound_safe' %} : elle s'appuie sur la <a href="{{ url_for('rules_lists') }}">liste sûre</a> (expéditeur authentifié)
+      {%- else %} : tout message arrive ici s'il n'a été retenu par aucune règle précédente{% endif %}.</div>
+  </div>
+  {% else %}
+  <label class="inline-fields">Le message correspond si
+    <select name="match" aria-label="Combinaison des conditions">
+      <option value="all" {% if rule.match != 'any' %}selected{% endif %}>toutes les conditions sont vraies</option>
+      <option value="any" {% if rule.match == 'any' %}selected{% endif %}>au moins une condition est vraie</option>
+    </select></label>
+  <fieldset data-grow="+ Ajouter une condition">
+    {% for c in conditions %}
+    <div class="cond-row">
+      <select name="cond_field_{{ loop.index0 }}" data-field aria-label="Champ de la condition {{ loop.index }}">
+        <option value="" data-kind="">{{ '— choisir un champ —' if loop.first else '— (inutilisée) —' }}</option>
+        {% for key, label, kind in fields %}<option value="{{ key }}" data-kind="{{ kind }}" {% if c.field == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <select name="cond_op_{{ loop.index0 }}" data-op aria-label="Opérateur de la condition {{ loop.index }}">
+        <option value="" data-kind="">—</option>
+        {% for value, kind, label in OPS %}<option value="{{ value }}" data-kind="{{ kind }}" {% if c.op == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <input name="cond_value_{{ loop.index0 }}" data-value value="{{ c.value if c.value is not boolean and c.value != '' else '' }}" maxlength="120" autocomplete="off" aria-label="Valeur de la condition {{ loop.index }}">
+    </div>
+    {% endfor %}
+  </fieldset>
+  <datalist id="known-symbols">{% for name in known_symbols %}<option value="{{ name }}">{% endfor %}</datalist>
+  <p class="muted small">Jusqu'à {{ conditions|length }} conditions. Les scores de classe (spam, logiciel malveillant, hameçonnage, usurpation, courrier en masse)
+    vont de 0 à 100. « Règle Rspamd déclenchée » teste la présence d'une règle précise (la liste des règles reconnues est proposée à la saisie).
+    Laissez vides les lignes inutilisées. Les adresses et domaines se comparent sans tenir compte de la casse.</p>
+  {% endif %}
+
+  <h2>Action</h2>
+  <label>Quand la règle s'applique
+    <select name="disposition">
+      {% for key, label in dispositions %}<option value="{{ key }}" {% if rule.disposition == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+  {% if not quarantine_enabled %}<p class="muted small">La quarantaine est désactivée dans « Messagerie » : l'action « Mettre en quarantaine » marque alors le message à la place.</p>{% endif %}
+  <div class="folder-block">
+    <div class="grid">
+      <label>Dossier de quarantaine
+        <input name="folder" value="{{ rule.folder }}" maxlength="40" list="known-folders" autocomplete="off" placeholder="Spam"></label>
+    </div>
+    <datalist id="known-folders">{% for name in known_folders %}<option value="{{ name }}">{% endfor %}</datalist>
+    <label class="check"><input type="checkbox" name="user_access" {% if rule.user_access %}checked{% endif %}> Le destinataire peut consulter et libérer ces messages (espace utilisateur et résumé quotidien)</label>
+    <p class="muted small">Sans cette case, le dossier est réservé à l'administrateur. Un message présentant un danger (programme malveillant, hameçonnage,
+      usurpation, score très élevé) reste de toute façon réservé à l'administrateur, quel que soit ce réglage.</p>
+  </div>
+
+  <h2>En-têtes</h2>
+  <label class="check"><input type="checkbox" name="explain" {% if rule.explain %}checked{% endif %}> Ajouter <code>X-Spambuntu-Rule</code> et <code>X-Spambuntu-Scores</code> (recommandé : la quarantaine et le journal s'en servent)</label>
+  <fieldset data-grow="+ Ajouter un en-tête">
+    {% for h in headers %}
+    <div class="hdr-row">
+      <input name="hdr_name_{{ loop.index0 }}" value="{{ h.name }}" maxlength="50" autocomplete="off" spellcheck="false" placeholder="X-Mon-En-Tete" aria-label="Nom de l'en-tête {{ loop.index }}">
+      <input name="hdr_value_{{ loop.index0 }}" value="{{ h.value }}" maxlength="200" autocomplete="off" placeholder="valeur" aria-label="Valeur de l'en-tête {{ loop.index }}">
+    </div>
+    {% endfor %}
+  </fieldset>
+  <p class="muted small">En-têtes ajoutés au message livré, même par une règle « Poursuivre » (par exemple pour qu'un serveur de messagerie classe le courrier
+    en masse). Ils doivent commencer par <code>X-</code> ; les en-têtes de Spambuntu et de Rspamd sont réservés. Un en-tête de même nom envoyé par
+    l'expéditeur est remplacé.</p>
+
+  <div class="actions">
+    <button type="submit" class="primary">{{ 'Ajouter la règle' if creating else 'Enregistrer' }}</button>
+    <a class="btn" href="{{ url_for('rules_page') }}">Annuler</a>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='rules.js') }}"></script>{% endblock %}

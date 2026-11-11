@@ -11,7 +11,7 @@ réputation, contenu) et ce que fait Spambuntu aujourd'hui. Statuts : **Natif** 
 | SPF | Natif | Modules SPF de Rspamd (`R_SPF_*`) |
 | DKIM | Natif | Vérification des signatures (`R_DKIM_*`) |
 | DMARC + alignement | Natif | Module DMARC de Rspamd (`DMARC_POLICY_*`) |
-| Action DMARC « reject » | Ajouté | Réglage `dmarc_action` : `reject` (défaut, conforme au tableau de décision), `quarantine` (rétention pour l'administrateur) ou `score` (points seulement) |
+| Action DMARC « reject » | Ajouté | Règle `inbound_dmarc` de la page « Règles » : rejet (défaut, conforme au tableau de décision), quarantaine réservée à l'administrateur, ou règle désactivée (points seulement) |
 
 ## 2. Usurpation et spoofing
 
@@ -49,7 +49,7 @@ seule** (un faux positif reste récupérable par l'administrateur).
 
 | Cas | Décision de référence | Spambuntu |
 |---|---|---|
-| DMARC reject ou malware | Rejet immédiat | DMARC : rejet par défaut (`dmarc_action`). Malware : en attente d'un moteur antivirus |
+| DMARC reject ou malware | Rejet immédiat | DMARC : rejet par défaut (règle `inbound_dmarc`). Malware : en attente d'un moteur antivirus |
 | SPF/DKIM invalide, domaine récent | Quarantaine | SPF/DKIM : points au score, quarantaine au seuil. Domaine récent : absent |
 | Score modéré | Courrier indésirable + marquage | Marquage `X-Spam: Yes` (le serveur de messagerie destinataire place le courrier dans « Indésirables ») |
 | Tout est validé | Livraison normale | Livraison normale |
@@ -63,7 +63,39 @@ et analyse par un administrateur ». Spambuntu applique les deux :
   uniquement de l'administrateur, qui analyse puis libère ou supprime ;
 - les **certitudes techniques** (DMARC « reject » publié par l'expéditeur) sont **rejetées au SMTP**,
   sans retenue, ce que le propriétaire du domaine a explicitement demandé ;
-- `dmarc_action = quarantine` bascule ce second cas en rétention administrateur si vous préférez ne rien perdre.
+- la règle `inbound_dmarc` (page « Règles ») bascule ce second cas en rétention administrateur si vous préférez ne rien perdre.
+
+## 6. Moteur de règles (page « Règles »)
+
+Le courrier est évalué par une liste **ordonnée** de règles ; la première règle qui s'applique décide, sauf les règles
+« Poursuivre », qui n'ajoutent que des en-têtes. Le moteur s'exécute dans Rspamd **après** l'analyse IA, donc voit
+toutes les règles déclenchées. Sans configuration lisible, il ne fait rien et les seuils de score restent seuls juges.
+
+| Classe | Score 0-100 | Origine |
+|---|---|---|
+| Spam | interpolé sur les seuils de la page Messagerie (marquage = 25, quarantaine = 50, rejet = 100) | score Rspamd |
+| Logiciel malveillant | additionne des signaux : virus (100), double extension (60), extension dangereuse, archive chiffrée ou imbriquée (40), leurre IA (60) | symboles Rspamd |
+| Hameçonnage | `PHISH*` (100), IA hameçonnage (85), IA identifiants (60), domaine récent d'URL, redirection HTML | symboles Rspamd + IA |
+| Usurpation et fraude | dirigeant (100), domaine imitateur / homoglyphes (90), nom d'affichage (60), DMARC « reject » (60), IA fraude au président (90), changement de coordonnées (70), cartes cadeaux (70)… | symboles Spambuntu + IA |
+| Courrier en masse | en-têtes de liste / `Precedence: bulk` (60), désabonnement (40) | symboles Rspamd |
+
+Conditions disponibles : les cinq scores, le score Rspamd brut, appartenance à la liste de blocage ou sûre, échec DMARC
+« reject », présence d'une règle Rspamd précise, adresse de l'expéditeur (contient / égale / se termine par), adresse d'un
+destinataire. Actions : livrer, marquer (`X-Spam: Yes`), mettre en quarantaine dans un **dossier**, rejeter, poursuivre.
+
+Garde-fous :
+- `inbound_blocked`, `inbound_safe` et `inbound_notspam` ne se suppriment pas et leur condition est verrouillée ;
+  `inbound_notspam` est toujours active et toujours la dernière (elle livre ce qu'aucune règle n'a retenu).
+- La **liste sûre exige une authentification** (DMARC validé ou SPF aligné) ; une adresse IP de la liste suffit. La liste
+  de blocage n'exige rien. Une règle personnalisée qui livre d'après la seule adresse de l'expéditeur provoque un avertissement.
+- Un dossier de quarantaine « accessible à l'utilisateur » ne rend **jamais** libérable un message portant un signal de
+  danger (logiciel malveillant, hameçonnage, usurpation, score très élevé) : la règle ne peut que restreindre.
+- Les en-têtes `X-Spambuntu-Rule` et `X-Spambuntu-Scores` envoyés par l'expéditeur sont toujours supprimés.
+- Le moteur Python (aperçu, tests) et le moteur Lua (Rspamd) sont vérifiés sur les mêmes cas de référence
+  (`tests/data/rules_golden.json`).
+
+Limites : pas de suppression silencieuse (Rspamd 3.8 ne connaît pas l'action « discard » : utiliser le rejet), pas de
+listes personnelles par utilisateur, pas de classes « adulte » ni « suspect », pas d'antivirus ni de bac à sable.
 
 ## Prochaines règles envisagées
 

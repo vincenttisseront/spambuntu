@@ -20,7 +20,8 @@ BASE = {"domains": [{"name": "exemple.fr", "relay": "mail.exemple.fr"}]}
 def test_defaults_enable_identity_and_reject_dmarc():
     cfg = mail.validate({})
     assert cfg["identity_enabled"] is True and cfg["vip"] == [] and cfg["brand_domains"] == []
-    assert cfg["dmarc_action"] == "reject"
+    dmarc = next(r for r in cfg["rules"] if r["id"] == "inbound_dmarc")
+    assert dmarc["enabled"] and dmarc["disposition"] == "reject"            # conforme au tableau de décision
 
 
 def test_vip_and_brands_are_normalized():
@@ -42,7 +43,7 @@ def test_vip_and_brands_are_normalized():
     {"brand_domains": ["pas un domaine"]},
     {"brand_domains": ["localhost"]},
     {"brand_domains": [123]},
-    {"dmarc_action": "drop"},
+    {"dmarc_action": "drop"},                                                       # ancien réglage : valeur toujours contrôlée
     {"identity_enabled": "oui"},
 ])
 def test_identity_validation_rejects(bad):
@@ -78,24 +79,33 @@ def test_disabling_identity_empties_the_rules():
     assert identity["enabled"] is False and identity["vip"] == [] and identity["brands"] == []
 
 
-@pytest.mark.parametrize("action,quarantine,expected", [
-    ("reject", True, {"reject": "reject", "quarantine": "quarantine"}),
-    ("quarantine", True, {"reject": "quarantine", "quarantine": "quarantine"}),
-    ("quarantine", False, {"reject": "add_header", "quarantine": "add_header"}),
-    ("score", True, {}),
+@pytest.mark.parametrize("legacy,enabled,disposition", [
+    ("reject", True, "reject"),
+    ("quarantine", True, "quarantine"),
+    ("score", False, "reject"),
 ])
-def test_dmarc_actions(action, quarantine, expected):
-    cfg = mail.validate({**BASE, "dmarc_action": action, "quarantine_enabled": quarantine})
-    text = mail.render_identity(cfg)["rspamd-dmarc.conf"]
-    found = dict(line.strip().rstrip(";").replace('"', "").split(" = ") for line in text.splitlines() if line.startswith("  "))
-    assert found == expected
+def test_legacy_dmarc_action_initializes_the_dmarc_rule(legacy, enabled, disposition):
+    """Une ancienne configuration (dmarc_action) reste acceptée : elle fixe seulement la règle inbound_dmarc par défaut."""
+    cfg = mail.validate({**BASE, "dmarc_action": legacy})
+    assert "dmarc_action" not in cfg
+    dmarc = next(r for r in cfg["rules"] if r["id"] == "inbound_dmarc")
+    assert dmarc["enabled"] is enabled and dmarc["disposition"] == disposition
+
+
+def test_dmarc_rule_is_rendered_for_rspamd():
+    rendered = json.loads(mail.render_identity(mail.validate(BASE))["rspamd-rules.json"])
+    dmarc = next(r for r in rendered["rules"] if r["id"] == "inbound_dmarc")
+    assert dmarc["disposition"] == "reject" and dmarc["conditions"] == [{"field": "dmarc_reject", "op": "is", "value": True}]
+    dmarc_conf = mail.render_identity(mail.validate(BASE))["rspamd-dmarc.conf"]
+    assert "reject" not in dmarc_conf and "quarantine" not in dmarc_conf                      # plus d'action DMARC propre à Rspamd
 
 
 def test_apply_writes_identity_and_dmarc_files(tmp_path):
     from test_mail import FakeRun
     mail.Applier(root=tmp_path, run=FakeRun(), reload=False).apply(mail.validate(BASE))
     assert json.loads((tmp_path / "etc/rspamd/local.d/spambuntu-identity.json").read_text())["domains"] == ["exemple.fr"]
-    assert "actions" in (tmp_path / "etc/rspamd/local.d/dmarc.conf").read_text()
+    assert (tmp_path / "etc/rspamd/local.d/dmarc.conf").exists()
+    assert json.loads((tmp_path / "etc/rspamd/local.d/spambuntu-rules.json").read_text())["rules"][-1]["id"] == "inbound_notspam"
 
 
 # ------------------------------------------------------------------ règles Lua (rspamadm lua)
@@ -130,13 +140,13 @@ from test_mail import FORM, mailweb  # noqa: E402,F401  (fixture)
 from test_webui import auth, web  # noqa: E402,F401  (fixtures)
 
 
-def test_form_saves_vip_brands_and_dmarc_action(mailweb):
+def test_form_saves_vip_and_brands(mailweb):
     data = {**FORM, "identity_enabled": "on", "vip": "Jean Dupont ; Jean.Dupont@exemple.fr\n# commentaire\n",
-            "brand_domains": "banque-exemple.fr, autre-marque.com", "dmarc_action": "quarantine", "csrf_token": mailweb.token}
+            "brand_domains": "banque-exemple.fr, autre-marque.com", "csrf_token": mailweb.token}
     assert mailweb.client.post("/messagerie", data=data).status_code == 302
     saved = json.loads((mailweb.mail_dir / "mail-request.json").read_text())
     assert saved["vip"] == [{"name": "Jean Dupont", "address": "jean.dupont@exemple.fr"}]
-    assert saved["brand_domains"] == ["banque-exemple.fr", "autre-marque.com"] and saved["dmarc_action"] == "quarantine"
+    assert saved["brand_domains"] == ["banque-exemple.fr", "autre-marque.com"] and "dmarc_action" not in saved
     assert saved["identity_enabled"] is True
 
 
@@ -144,7 +154,6 @@ def test_form_saves_vip_brands_and_dmarc_action(mailweb):
     {"vip": "Jean Dupont jean@exemple.fr"},          # séparateur manquant
     {"vip": "Jean ; jean@exemple.fr"},                # nom incomplet
     {"brand_domains": "pas un domaine"},
-    {"dmarc_action": "drop"},
 ])
 def test_form_refuses_invalid_identity_settings(mailweb, override):
     r = mailweb.client.post("/messagerie", data={**FORM, **override, "csrf_token": mailweb.token}, follow_redirects=True)

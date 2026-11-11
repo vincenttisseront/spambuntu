@@ -1,5 +1,5 @@
 {% from "_icons.html" import icon %}
-{% set titles = {'index': 'Tableau de bord', 'quarantine': 'Quarantaine', 'journal': 'Journal', 'ai': 'Analyse IA', 'mail': 'Messagerie', 'update': 'Mises à jour'} %}
+{% set titles = {'index': 'Tableau de bord', 'quarantine': 'Quarantaine', 'journal': 'Journal', 'ai': 'Analyse IA', 'mail': 'Messagerie', 'rules': 'Règles de filtrage', 'update': 'Mises à jour'} %}
 <!doctype html>
 <html lang="fr">
 <head>
@@ -24,6 +24,7 @@
       <div class="nav-label">Courrier</div>
       <a href="{{ url_for('quarantine_page') }}" {% if active == 'quarantine' %}class="active" aria-current="page"{% endif %}>{{ icon('inbox') }}Quarantaine</a>
       <a href="{{ url_for('journal_page') }}" {% if active == 'journal' %}class="active" aria-current="page"{% endif %}>{{ icon('journal') }}Journal</a>
+      <a href="{{ url_for('rules_page') }}" {% if active == 'rules' %}class="active" aria-current="page"{% endif %}>{{ icon('rules') }}Règles</a>
       <div class="nav-label">Sécurité</div>
       <a href="{{ url_for('ai_page') }}" {% if active == 'ai' %}class="active" aria-current="page"{% endif %}>{{ icon('ai') }}Analyse IA</a>
       <div class="nav-label">Opérations</div>

@@ -20,6 +20,8 @@
     <dt>Adresse IP</dt><dd>{{ v.ip }}</dd>
     <dt>Taille</dt><dd>{{ v.size | size }}</dd>
     <dt>Durée d'analyse</dt><dd>{{ v.time_ms }} ms</dd>
+    {% if v.rule %}<dt>Règle de filtrage</dt><dd><a class="rule-link" href="{{ url_for('rule_edit', rule_id=v.rule) }}">{{ v.rule }}</a>{% if v.folder %} · dossier <code>{{ v.folder }}</code>{% endif %}</dd>
+    {% if v.class_scores %}<dt>Scores par classe</dt><dd>{% for name, label in classes %}{{ label }} <strong>{{ v.class_scores.get(name, 0) }}</strong>{% if not loop.last %} · {% endif %}{% endfor %}</dd>{% endif %}{% endif %}
     {% if v.qid %}<dt>File Postfix</dt><dd>{{ v.qid }}</dd>{% endif %}
     <dt>Message-ID</dt><dd>{{ v.mid }}</dd>
   </dl>

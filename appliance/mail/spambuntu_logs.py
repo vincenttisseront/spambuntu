@@ -3,7 +3,7 @@
 
   spambuntu-mailstats summary [--hours N]
   spambuntu-mailstats search [--q TEXTE] [--action A] [--hours N] [--limit N] [--sender S] [--rcpt R] [--ip IP]
-                             [--symbol RÈGLE] [--min-score N] [--max-score N]
+                             [--symbol RÈGLE] [--rule CLASSIFICATION] [--min-score N] [--max-score N]
   spambuntu-mailstats trace IDENTIFIANT [--hours N]
 
 Exécuté en root via sudo par la console (le journal n'est pas lisible par l'utilisateur de la console) :
@@ -54,6 +54,8 @@ FIELD_RES = {
     "time_ms": re.compile(r"\btime: ([\d.]+)ms"),
 }
 VERDICT_RE = re.compile(r"\(default: ([TF]) \(([a-z ]+)\): \[(-?[\d.]+)/([\d.]+)\] \[(.*?)\]\),")
+RULE_ID_RE = re.compile(r"[a-z][a-z0-9_]{2,39}")
+CLASS_NAMES = ("spam", "malware", "phish", "impostor", "bulk")
 SYMBOL_RE = re.compile(r"([A-Z][A-Z0-9_]+)\((-?[\d.]+)\)(?:\{([^}]*)\})?")
 
 
@@ -82,6 +84,10 @@ def parse_line(line: str):
     record["symbols"] = [name for name, weight, _ in found if abs(float(weight)) >= 1.0][:10]
     record["sym_all"] = [{"name": n, "score": float(w), "options": o[:120]} for n, w, o in found][:80]
     record["time_ms"] = float(record["time_ms"] or 0)
+    applied = next((x["options"].split(";") for x in record["sym_all"] if x["name"] == "SPAMBUNTU_RULE"), [])
+    record["rule"] = applied[0] if applied and RULE_ID_RE.fullmatch(applied[0]) else ""        # règle de filtrage appliquée
+    record["folder"] = applied[1] if len(applied) > 1 and applied[1] not in ("-", "") else ""
+    record["class_scores"] = {k: int(v) for k, _, v in (o.partition(":") for o in applied[3:]) if k in CLASS_NAMES and v.isdigit()}
     return record
 
 
@@ -134,6 +140,7 @@ def summarize(records: list, hours: int, now: float | None = None) -> dict:
         "hours": hours, "total": len(records), "counts": {c: counts.get(c, 0) for c in CATEGORIES},
         "step": step, "timeline": buckets,
         "top_sender_domains": top(senders), "top_ips": top(ips), "top_symbols": top(symbols),
+        "rule_hits": dict(collections.Counter(r.get("rule", "") for r in records if r.get("rule"))),
         "oldest": records[0]["ts"] if records else None,
     }
 
@@ -144,8 +151,8 @@ def public(record: dict) -> dict:
 
 
 def search(records: list, query: str = "", action: str = "", limit: int = 100, *, sender: str = "", rcpt: str = "", ip: str = "",
-           symbol: str = "", min_score=None, max_score=None) -> list:
-    needle, sender, rcpt, ip, symbol = (x.strip().lower() for x in (query, sender, rcpt, ip, symbol))
+           symbol: str = "", rule: str = "", min_score=None, max_score=None) -> list:
+    needle, sender, rcpt, ip, symbol, rule = (x.strip().lower() for x in (query, sender, rcpt, ip, symbol, rule))
     out = []
     for r in reversed(records):                                  # plus récents d'abord
         if action and r["category"] != action:
@@ -159,6 +166,8 @@ def search(records: list, query: str = "", action: str = "", limit: int = 100, *
         if ip and ip not in r["ip"].lower():
             continue
         if symbol and not any(symbol in s["name"].lower() for s in r["sym_all"]):
+            continue
+        if rule and r.get("rule", "") != rule:
             continue
         if min_score is not None and r["score"] < min_score:
             continue
@@ -233,7 +242,7 @@ def main(argv=None) -> int:
     q.add_argument("--action", default="", choices=("",) + CATEGORIES)
     q.add_argument("--hours", type=int, default=24)
     q.add_argument("--limit", type=int, default=100)
-    for name in ("sender", "rcpt", "ip", "symbol"):
+    for name in ("sender", "rcpt", "ip", "symbol", "rule"):
         q.add_argument(f"--{name}", default="")
     q.add_argument("--min-score", type=float, default=None)
     q.add_argument("--max-score", type=float, default=None)
@@ -250,11 +259,11 @@ def main(argv=None) -> int:
                 raise ValueError("Identifiant invalide")
             result = {"ok": True, **trace(read_records(hours), args.ident, hours)}
         else:
-            for value in (args.q, args.sender, args.rcpt, args.ip, args.symbol):
+            for value in (args.q, args.sender, args.rcpt, args.ip, args.symbol, args.rule):
                 if value and not QUERY_RE.fullmatch(value):
                     raise ValueError("Recherche invalide (lettres, chiffres et @ . + - : seulement)")
             result = {"ok": True, "records": search(read_records(hours), args.q, args.action, max(1, min(args.limit, MAX_LIMIT)),
-                                                    sender=args.sender, rcpt=args.rcpt, ip=args.ip, symbol=args.symbol,
+                                                    sender=args.sender, rcpt=args.rcpt, ip=args.ip, symbol=args.symbol, rule=args.rule,
                                                     min_score=args.min_score, max_score=args.max_score)}
     except (OSError, ValueError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))

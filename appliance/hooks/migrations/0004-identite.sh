@@ -1,6 +1,6 @@
 #!/bin/bash
-# 0.3.0 : protection d'identité (dirigeants, domaines imitateurs, homoglyphes) et action DMARC. Idempotent.
-# Attention : l'action par défaut pour un échec DMARC « reject » devient le rejet immédiat (réglable dans « Messagerie »).
+# 0.3.0 : protection d'identité (dirigeants, domaines imitateurs, homoglyphes). Idempotent.
+# Attention : un échec DMARC « reject » est désormais rejeté par défaut (règle inbound_dmarc de la page « Règles »).
 set -euo pipefail
 
 [ -z "${DESTDIR:-}" ] || exit 0

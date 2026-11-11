@@ -410,3 +410,76 @@ h3 .icon { vertical-align: -.2em; margin-right: .3rem; }
   table.list .trunc { max-width: 9rem; }
   table.list .trunc.subj { max-width: 11rem; }
 }
+
+/* ---------------------------------------------------------------- règles de filtrage */
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.primary:hover { filter: brightness(1.08); border-color: var(--accent); }
+.btn .count { margin-left: .2rem; padding: 0 .4rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.toolbar-row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: 0 0 .85rem; }
+.toolbar-row .spacer { flex: 1; }
+
+table.rules-table td { vertical-align: top; padding-top: .6rem; padding-bottom: .6rem; }
+table.rules-table tr.is-off td { opacity: .55; }
+table.rules-table tr.is-off td.sw, table.rules-table tr.is-off td.ord, table.rules-table tr.is-off td.act { opacity: 1; }
+table.rules-table .rule-id { font: 600 .85rem var(--font-mono); text-decoration: none; color: var(--accent-ink); overflow-wrap: anywhere; }
+table.rules-table .rule-id:hover { text-decoration: underline; }
+table.rules-table .lock { margin-left: .3rem; color: var(--muted); }
+table.rules-table .lock .icon { width: .8rem; height: .8rem; vertical-align: -.1em; }
+table.rules-table td.what { min-width: 11rem; max-width: 16rem; }
+table.rules-table td.what .muted { margin-top: .15rem; }
+table.rules-table td.cond { min-width: 13rem; max-width: 22rem; font-size: .85rem; }
+table.rules-table td.cond .joiner { font-size: .7rem; font-weight: 600; letter-spacing: .04em; color: var(--muted); margin: .1rem 0; }
+table.rules-table td.actionlist { min-width: 14rem; max-width: 24rem; font-size: .83rem; }
+table.rules-table ul.bullets { margin: .35rem 0 0; padding-left: 1.05rem; }
+table.rules-table ul.bullets li { margin: .12rem 0; overflow-wrap: anywhere; }
+table.rules-table td.sw, table.rules-table th.sw { width: 3.6rem; }
+table.rules-table td.ord { white-space: nowrap; width: 1%; }
+table.rules-table td.ord form { display: inline; margin: 0; }
+table.rules-table th.r, table.rules-table td.r { text-align: right; }
+table.rules-table td.act { white-space: nowrap; }
+table.rules-table td.act form { display: inline; margin: 0; }
+table.rules-table td.act .btn.icon-btn { vertical-align: middle; }
+button.icon-btn:disabled { opacity: .3; cursor: default; }
+
+/* interrupteur d'activation (sans script : c'est un bouton de formulaire) */
+.switch { position: relative; width: 2.35rem; height: 1.3rem; padding: 0; border-radius: 999px; border: 1px solid var(--line); background: var(--line); cursor: pointer; vertical-align: middle; }
+.switch .knob { position: absolute; top: 2px; left: 2px; width: calc(1.3rem - 6px); height: calc(1.3rem - 6px); border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: left .15s; }
+.switch.on { background: var(--accent); border-color: var(--accent); }
+.switch.on .knob { left: calc(100% - 1.3rem + 2px); }
+.switch.fixed { display: inline-flex; align-items: center; justify-content: center; width: 2.35rem; background: var(--panel); color: var(--muted); cursor: default; }
+.switch.fixed .icon { width: .85rem; height: .85rem; }
+
+/* formulaire d'une règle */
+.rule-form fieldset { border: 0; padding: 0; margin: 0 0 .5rem; }
+.rule-form h2 { margin-top: 1.4rem; }
+.rule-form h2:first-of-type { margin-top: 0; }
+.cond-row { display: grid; grid-template-columns: minmax(12rem, 1.4fr) minmax(9rem, .8fr) minmax(8rem, 1fr); gap: .5rem; margin: 0 0 .5rem; align-items: center; }
+.cond-row select, .cond-row input, .hdr-row input { width: 100%; font: inherit; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); color: var(--text); }
+.hdr-row { display: grid; grid-template-columns: minmax(8rem, .8fr) minmax(10rem, 1.4fr); gap: .5rem; margin: 0 0 .5rem; }
+.locked-conds { padding: .6rem .8rem; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin: 0 0 .75rem; }
+.cond-row[hidden], .hdr-row[hidden], .folder-block[hidden], button[hidden] { display: none; }
+.cond-row .no-value { visibility: hidden; }
+.cond-row.empty { opacity: .8; }
+.inline-fields { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: center; margin: .25rem 0 .75rem; }
+.lists-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1rem; }
+@media (max-width: 640px) {
+  .cond-row, .hdr-row { grid-template-columns: 1fr; }
+}
+
+/* règle de filtrage dans la quarantaine et le journal */
+.rule-link { font: 500 .8rem var(--font-mono); text-decoration: none; color: var(--accent-ink); }
+.rule-link:hover { text-decoration: underline; }
+table.list .folder-line { max-width: 7.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .72rem; color: var(--muted); margin-top: .12rem; }
+.classbars { display: grid; gap: .35rem; margin: .25rem 0 0; }
+.classbar { display: grid; grid-template-columns: 11rem minmax(6rem, 1fr) 2.2rem; gap: .6rem; align-items: center; font-size: .85rem; }
+.classbar .cb-label { color: var(--muted); }
+.classbar .cb-value { text-align: right; font-variant-numeric: tabular-nums; }
+.classbar progress { width: 100%; height: .55rem; border: 0; border-radius: 999px; background: var(--line); overflow: hidden; appearance: none; }
+.classbar progress::-webkit-progress-bar { background: var(--line); border-radius: 999px; }
+.classbar progress::-webkit-progress-value { background: var(--accent); border-radius: 999px; }
+.classbar progress::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
+.classbar progress.warm::-webkit-progress-value { background: #d97706; }
+.classbar progress.warm::-moz-progress-bar { background: #d97706; }
+.classbar progress.hot::-webkit-progress-value { background: #dc2626; }
+.classbar progress.hot::-moz-progress-bar { background: #dc2626; }
+@media (max-width: 760px) { table.list .col-sym { display: none; } .classbar { grid-template-columns: 8rem 1fr 2rem; } }
