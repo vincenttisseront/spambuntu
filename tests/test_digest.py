@@ -205,7 +205,8 @@ def test_user_space_lists_messages_escaped_without_technical_details(portal):
     assert page.status_code == 200 and "moi@exemple.fr" in html and "2 message(s) ont été bloqués" in html
     assert "<img src=x" not in html and "&lt;img src=x" in html
     assert "score" not in html.lower() and "Hameçonnage" not in html
-    assert html.count("Libérer ce message") == 2 and html.count(">Supprimer<") == 1       # pas de suppression si plusieurs destinataires
+    assert html.count("Libérer</button>") == 2                                          # liste compacte : libération rapide + vue dédiée
+    assert "Promo" in html and "/message/AAAAAAAAAA1" in html
     assert portal.calls[0][:3] == ["list", "--recipient", "moi@exemple.fr"] and "--max-score" in portal.calls[0]
     assert "no-store" in page.headers["Cache-Control"]
 
@@ -238,9 +239,10 @@ def test_user_actions_are_scoped_to_the_token_recipient(portal):
 def test_admin_view_separates_risk_from_ordinary(portal):
     risk = portal.client.get("/quarantaine").get_data(as_text=True)
     assert "Virement urgent" in risk and "Hameçonnage" in risk and "Promo" not in risk
-    assert "Libérer après analyse" in risk and 'name="confirm" required' in risk and "Légitime : libérer" not in risk
+    assert "Libérer après analyse" not in risk and "Analyser ce message" in risk                  # la décision se prend dans la vue d'analyse
+    assert 'name="queue_id" value="CCCCCCCCCC3"' not in risk                              # aucune sélection en lot pour le courrier à risque
     ordinary = portal.client.get("/quarantaine?vue=ordinaire").get_data(as_text=True)
-    assert "Promo" in ordinary and "Virement urgent" not in ordinary and "Légitime : libérer" in ordinary
+    assert "Promo" in ordinary and "Virement urgent" not in ordinary and 'name="queue_id" value="AAAAAAAAAA1"' in ordinary
     everything = portal.client.get("/quarantaine?vue=tout").get_data(as_text=True)
     assert everything.index("Virement urgent") < everything.index("Promo")                 # le risque d'abord
     assert "Virement urgent" in portal.client.get("/quarantaine?vue=nimportequoi").get_data(as_text=True)       # vue inconnue : repli sur « à examiner »

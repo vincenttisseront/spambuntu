@@ -215,6 +215,16 @@ install_mail() {
     "$SBIN/spambuntu-mail" init --no-reload
 }
 
+install_identity() {
+    # Règles Rspamd de protection d'identité (fichiers gérés par Spambuntu, configuration rendue par spambuntu-mail).
+    [ -z "$D" ] || return 0
+    install -d -m 0755 /etc/rspamd/spambuntu
+    install -m 0644 "$SRC/mail/rspamd/identity_lib.lua" /etc/rspamd/spambuntu/identity_lib.lua
+    install -m 0644 "$SRC/mail/rspamd/spambuntu_identity.lua" /etc/rspamd/spambuntu/spambuntu_identity.lua
+    printf '%s\n' '-- Géré par Spambuntu : ne pas modifier' 'dofile("/etc/rspamd/spambuntu/spambuntu_identity.lua")' > /etc/rspamd/rspamd.local.lua
+    chmod 0644 /etc/rspamd/rspamd.local.lua
+}
+
 install_ai() {
     # Règle Rspamd (fichier géré par Spambuntu) et configuration par défaut : IA désactivée.
     [ -z "$D" ] || return 0
@@ -255,6 +265,7 @@ else
     install_config
     install_pubkey
     install_motd
+    install_identity
     install_mail
     install_ai
     enable_services

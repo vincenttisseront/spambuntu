@@ -12,8 +12,10 @@ Cmnd_Alias SPAMBUNTU_MAIL = \
     /usr/bin/systemctl start --no-block spambuntu-ai-apply.service, \
     /usr/local/sbin/spambuntu-quarantine list, \
     /usr/local/sbin/spambuntu-quarantine list --recipient *, \
+    /usr/local/sbin/spambuntu-quarantine show *, \
     /usr/local/sbin/spambuntu-quarantine release * --actor *, \
     /usr/local/sbin/spambuntu-quarantine delete * --actor *, \
     /usr/local/sbin/spambuntu-mailstats summary --hours *, \
-    /usr/local/sbin/spambuntu-mailstats search *
+    /usr/local/sbin/spambuntu-mailstats search *, \
+    /usr/local/sbin/spambuntu-mailstats trace *
 spambuntu ALL=(root) NOPASSWD: SPAMBUNTU_UPDATE, SPAMBUNTU_MAIL

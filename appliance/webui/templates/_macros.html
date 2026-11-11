@@ -1,0 +1,31 @@
+{% from "_icons.html" import icon %}
+{# Pagination : adresses précédente / suivante calculées par la page appelante. #}
+{% macro pagination(pg, prev_url, next_url) -%}
+{% if pg.pages > 1 %}
+<nav class="pager" aria-label="Pagination">
+  <span class="muted small">{{ pg.first }}–{{ pg.last }} sur {{ pg.total }}</span>
+  {% if pg.page > 1 %}<a class="btn" href="{{ prev_url }}">{{ icon('chev-left') }}Précédent</a>{% else %}<span class="btn off">{{ icon('chev-left') }}Précédent</span>{% endif %}
+  <span class="small">Page {{ pg.page }} / {{ pg.pages }}</span>
+  {% if pg.page < pg.pages %}<a class="btn" href="{{ next_url }}">Suivant{{ icon('chev-right') }}</a>{% else %}<span class="btn off">Suivant{{ icon('chev-right') }}</span>{% endif %}
+</nav>
+{% elif pg.total %}<p class="muted small pager-count">{{ pg.total }} résultat(s)</p>{% endif %}
+{%- endmacro %}
+
+{# Pastille de score : couleur selon les seuils configurés. #}
+{% macro score_chip(score, th) -%}
+{% if score is none %}<span class="score na" title="Score inconnu">?</span>
+{% else %}{% set band = 'high' if score >= th.reject * 0.8 else ('mid' if score >= th.quarantine else ('low' if score >= th.tag else 'none')) %}
+<span class="score {{ band }}" title="Score {{ score }} (marquage {{ th.tag }}, quarantaine {{ th.quarantine }}, rejet {{ th.reject }})">{{ '%.1f' % score }}</span>{% endif %}
+{%- endmacro %}
+
+{# Jauge de score en SVG (géométrie calculée côté serveur). #}
+{% macro gauge_svg(g) -%}
+<svg class="gauge" viewBox="0 0 {{ g.width }} 8" preserveAspectRatio="none" role="img" aria-label="Score par rapport aux seuils">
+  <rect class="g-bg" x="0" y="2" width="{{ g.width }}" height="4" rx="2"/>
+  <rect class="g-ok" x="0" y="2" width="{{ g.tag }}" height="4" rx="2"/>
+  <rect class="g-tag" x="{{ g.tag }}" y="2" width="{{ g.quarantine - g.tag }}" height="4"/>
+  <rect class="g-quar" x="{{ g.quarantine }}" y="2" width="{{ g.reject - g.quarantine }}" height="4"/>
+  <rect class="g-rej" x="{{ g.reject }}" y="2" width="{{ g.width - g.reject }}" height="4" rx="2"/>
+  {% if g.score is not none %}<rect class="g-mark" x="{{ [g.score - 0.6, 0]|max }}" y="0" width="1.2" height="8"/>{% endif %}
+</svg>
+{%- endmacro %}

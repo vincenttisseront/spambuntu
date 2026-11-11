@@ -44,9 +44,26 @@ DEFAULTS = {
     "digest_from": "",                  # expéditeur du résumé (vide : quarantaine@<nom d'hôte>)
     "digest_base_url": "",              # https://hôte[:port] de la console, pour les liens de libération (vide : sans liens)
     "digest_release_max_score": 10.0,   # score au-delà duquel un message n'est pas libérable depuis le résumé
+    "identity_enabled": True,           # détection des usurpations : dirigeants, domaines imitateurs, homoglyphes
+    "vip": [],                          # dirigeants protégés : [{"name": "Jean Dupont", "address": "jean.dupont@exemple.fr"}]
+    "brand_domains": [],                # domaines de marques à protéger en plus de la liste intégrée
+    "dmarc_action": "reject",           # échec d'une politique DMARC « reject » : reject | quarantine | score
 }
 
+# Marques et services les plus imités dans les campagnes d'hameçonnage (domaines légitimes à ne pas confondre avec une imitation).
+BUILTIN_BRANDS = (
+    "microsoft.com", "office.com", "outlook.com", "live.com", "google.com", "gmail.com", "apple.com", "icloud.com",
+    "amazon.com", "paypal.com", "netflix.com", "facebook.com", "linkedin.com", "dropbox.com", "docusign.com", "adobe.com",
+    "dhl.com", "fedex.com", "ups.com", "orange.fr", "free.fr", "sfr.fr", "laposte.fr", "colissimo.fr", "ameli.fr",
+    "impots.gouv.fr", "service-public.fr", "ovhcloud.com", "ovh.com",
+)
+DMARC_ACTIONS = ("reject", "quarantine", "score")
+MAX_VIP = 200
+MAX_BRANDS = 200
+
 _LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@" + _LABEL + r"(?:\." + _LABEL + r")+$")
+VIP_NAME_RE = re.compile(r"^[^\x00-\x1f\x7f\"\\<>\[\];,]{3,80}$")
 HOSTNAME_RE = re.compile(rf"^{_LABEL}(?:\.{_LABEL})*$")
 DOMAIN_RE = re.compile(rf"^{_LABEL}(?:\.{_LABEL})+$")
 
@@ -90,6 +107,39 @@ def _number(value, what: str, low: float, high: float) -> float:
     if not low <= number <= high:
         raise MailError(f"{what} doit être compris entre {low:g} et {high:g}")
     return round(number, 2)
+
+
+def _vip_list(value) -> list:
+    if not isinstance(value, list) or len(value) > MAX_VIP:
+        raise MailError(f"Liste de dirigeants invalide (maximum {MAX_VIP})")
+    clean, seen = [], set()
+    for item in value:
+        if not isinstance(item, dict) or set(item) - {"name", "address"}:
+            raise MailError("Dirigeant mal formé")
+        name, address = item.get("name"), item.get("address")
+        if not isinstance(name, str) or not VIP_NAME_RE.fullmatch(name.strip()) or len(name.split()) < 2:
+            raise MailError(f"Nom de dirigeant invalide : {str(name)[:60]!r} (prénom et nom attendus)")
+        if not isinstance(address, str) or not EMAIL_RE.fullmatch(address.strip()):
+            raise MailError(f"Adresse de dirigeant invalide : {str(address)[:60]!r}")
+        key = (" ".join(name.split()).lower(), address.strip().lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        clean.append({"name": " ".join(name.split()), "address": address.strip().lower()})
+    return clean
+
+
+def _brand_list(value) -> list:
+    if not isinstance(value, list) or len(value) > MAX_BRANDS:
+        raise MailError(f"Liste de marques invalide (maximum {MAX_BRANDS})")
+    clean = []
+    for item in value:
+        if not isinstance(item, str) or len(item) > 253 or not DOMAIN_RE.fullmatch(item.strip().lower()):
+            raise MailError(f"Domaine de marque invalide : {str(item)[:60]!r}")
+        domain = item.strip().lower()
+        if domain not in clean:
+            clean.append(domain)
+    return clean
 
 
 def validate(raw) -> dict:
@@ -150,6 +200,13 @@ def validate(raw) -> dict:
             raise MailError("Adresse de la console invalide (https://hôte[:port])")
     cfg["digest_release_max_score"] = _number(cfg["digest_release_max_score"], "Score maximal de libération", 0, 100)
 
+    if not isinstance(cfg["identity_enabled"], bool):
+        raise MailError("Option de protection d'identité invalide")
+    cfg["vip"] = _vip_list(cfg["vip"])
+    cfg["brand_domains"] = _brand_list(cfg["brand_domains"])
+    if cfg["dmarc_action"] not in DMARC_ACTIONS:
+        raise MailError("Action DMARC invalide (reject, quarantine ou score)")
+
     networks = cfg["trusted_networks"]
     if not isinstance(networks, list) or len(networks) > MAX_NETWORKS:
         raise MailError("Réseaux de confiance invalides")
@@ -169,6 +226,29 @@ def validate(raw) -> dict:
 # --------------------------------------------------------------------------- rendu
 
 TLS_DIR = Path("/etc/spambuntu/tls")
+
+
+def render_identity(cfg: dict) -> dict:
+    """Fichiers de la protection d'identité (règles Lua) et de l'action DMARC. Configuration VALIDÉE uniquement."""
+    th = cfg["thresholds"]
+    # Une usurpation suspectée suffit à atteindre la quarantaine (ou le marquage si elle est désactivée), jamais le rejet.
+    strong = th["quarantine"] if cfg["quarantine_enabled"] else th["tag"]
+    strong = round(min(strong, th["reject"] - 0.1), 2)
+    identity = {
+        "enabled": cfg["identity_enabled"],
+        "domains": [d["name"] for d in cfg["domains"]],
+        "vip": cfg["vip"] if cfg["identity_enabled"] else [],
+        "brands": list(dict.fromkeys([*BUILTIN_BRANDS, *cfg["brand_domains"]])) if cfg["identity_enabled"] else [],
+        "score_identity": strong,
+        "score_brand": round(min(2.5, th["tag"] - 0.1), 2),
+        "score_image": round(min(2.0, th["tag"] - 0.1), 2),
+    }
+    # Politique DMARC « reject » de l'expéditeur en échec : rejet immédiat (défaut, tableau de décision), mise en quarantaine
+    # pour analyse par l'administrateur, ou simple score. Sans quarantaine, la rétention retombe sur le marquage.
+    held = "quarantine" if cfg["quarantine_enabled"] else "add_header"
+    actions = {"reject": {"reject": "reject", "quarantine": held}, "quarantine": {"reject": held, "quarantine": held}}.get(cfg["dmarc_action"], {})
+    dmarc = "# Géré par Spambuntu : ne pas modifier\n" + "actions = {\n" + "".join(f'  {k} = "{v}";\n' for k, v in actions.items()) + "}\n"
+    return {"rspamd-identity.json": json.dumps(identity, indent=2, ensure_ascii=False) + "\n", "rspamd-dmarc.conf": dmarc}
 
 
 def render(cfg: dict, system_hostname: str = "localhost.localdomain", tls: bool = False) -> dict:
@@ -206,6 +286,7 @@ def render(cfg: dict, system_hostname: str = "localhost.localdomain", tls: bool 
            if cfg["trusted_networks"] else ""),
         "rspamd-redis.conf": '# Géré par Spambuntu : ne pas modifier\nservers = "127.0.0.1";\n',
     }
+    files.update(render_identity(cfg))
     mynetworks = ["127.0.0.0/8", "[::1]/128", *cfg["trusted_networks"]]
     size = cfg["max_message_mb"] * 1024 * 1024
     postconf = {
@@ -324,6 +405,8 @@ class Applier:
             "rspamd-greylist.conf": self.p(RSPAMD_DIR / "local.d" / "greylist.conf"),
             "rspamd-options.inc": self.p(RSPAMD_DIR / "local.d" / "options.inc"),
             "rspamd-redis.conf": self.p(RSPAMD_DIR / "local.d" / "redis.conf"),
+            "rspamd-identity.json": self.p(RSPAMD_DIR / "local.d" / "spambuntu-identity.json"),
+            "rspamd-dmarc.conf": self.p(RSPAMD_DIR / "local.d" / "dmarc.conf"),
         }
         before = {name: (path.read_text(encoding="utf-8") if path.is_file() else None) for name, path in targets.items()}
         old_conf = {key: self._postconf_get(key) for key in plan["postconf"]}

@@ -110,13 +110,13 @@ def test_dashboard_without_stats(statsweb):
 def test_journal_page(statsweb):
     html = statsweb.client.get("/journal?q=e.test&action=rejected&hours=72").get_data(as_text=True)
     assert "<script>x" not in html and "&lt;script&gt;" in html
-    assert statsweb.stats_calls[-1] == ["search", "--hours", "72", "--limit", "200", "--q", "e.test", "--action", "rejected"]
+    assert statsweb.stats_calls[-1] == ["search", "--hours", "72", "--limit", "500", "--q", "e.test", "--action", "rejected"]
 
 
 def test_journal_sanitizes_input(statsweb):
     html = statsweb.client.get("/journal?q=a;b|c&action=x&hours=99999").get_data(as_text=True)
     assert "Recherche invalide" in html
-    assert statsweb.stats_calls[-1] == ["search", "--hours", "24", "--limit", "200"]
+    assert statsweb.stats_calls[-1] == ["search", "--hours", "24", "--limit", "500"]
 
 
 def test_journal_requires_login(web):

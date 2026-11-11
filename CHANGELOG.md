@@ -27,11 +27,29 @@ console web de l'appliance au moment de proposer la mise à jour.
   ses seuls messages ordinaires ; il voit le nombre de messages bloqués sans pouvoir les consulter ;
   aucun entraînement du filtre depuis cet espace.
 - Libérer un message dangereux demande à l'administrateur une confirmation explicite après analyse.
+- Protection contre l'usurpation d'identité : nom d'affichage d'un dirigeant protégé utilisé depuis une adresse
+  externe (liste « Dirigeants » de la page Messagerie), domaines imitateurs (faute de frappe, chiffre pour lettre,
+  changement d'extension) de vos domaines et d'une liste de marques extensible, alphabets mélangés (homoglyphes,
+  punycode), nom de marque dans un autre domaine, courrier composé d'images seules. Une heuristique d'identité
+  ne fait jamais rejeter un message à elle seule : il est retenu pour l'administrateur.
+- Réglage « Action en cas d'échec DMARC » (rejet, quarantaine, points seulement) sur la page Messagerie.
+- Listes compactes (une ligne par message) avec filtres : quarantaine (expéditeur, destinataire, objet, motif de
+  risque, règle, score, période, tri), journal (expéditeur, destinataire, IP, règle, score, résultat, période)
+  et espace « Mes messages » (recherche, période) ; pagination ; actions en lot sur le courrier ordinaire.
+- Vues dédiées à l'analyse : détail d'un message en quarantaine (verdict, jauge de score, règles déclenchées
+  expliquées en français, aperçu en texte seul, pièces jointes, liens neutralisés, en-têtes) et parcours d'un
+  message dans le journal (règles Rspamd puis livraison Postfix). Le destinataire dispose d'une vue détail
+  limitée à un extrait en texte seul.
+- Document `docs/regles-antispam.md` : correspondance entre le catalogue de règles antispam et Spambuntu
+  (ce qui est natif, ajouté ou absent).
 
 ### Modifié
 - Nouvelle identité visuelle de la console : barre latérale par rubriques, icônes, thème clair/sombre
   (mémorisé), polices servies par l'appliance (aucune ressource externe), vue utilisateur épurée.
   Code couleur : rouge = réservé à l'administrateur, bleu = courrier ordinaire gérable, orange = attention.
+- Comportement : un message dont l'expéditeur publie une politique DMARC « reject » et échoue à l'authentification
+  est désormais rejeté au SMTP (conforme à la politique du domaine). Pour le retenir en quarantaine à la place,
+  choisissez « Quarantaine » dans « Action en cas d'échec DMARC ».
 
 ## [0.2.0] - 2026-11-11
 

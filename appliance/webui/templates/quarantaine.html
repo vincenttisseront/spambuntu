@@ -1,61 +1,85 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_macros.html" import pagination, score_chip %}
 {% block title %}Quarantaine · Spambuntu{% endblock %}
 {% block content %}
 <h1>Quarantaine</h1>
 {% if error %}<div class="banner error" role="alert">{{ error }}</div>{% endif %}
 
-<div class="tiles">
-  <div class="tile risk-high"><span class="tile-icon">{{ icon('alert') }}</span><div><strong>{{ counts.admin }}</strong><span class="label">à examiner (risque)</span></div></div>
-  <div class="tile risk-ord"><span class="tile-icon">{{ icon('inbox') }}</span><div><strong>{{ counts.user }}</strong><span class="label">courrier indésirable ordinaire</span></div></div>
-</div>
-<nav class="segmented" aria-label="Filtrer">
-  <a href="{{ url_for('quarantine_page', vue='risque') }}" {% if view == 'risque' %}class="active" aria-current="page"{% endif %}>À examiner<span class="count">{{ counts.admin }}</span></a>
-  <a href="{{ url_for('quarantine_page', vue='ordinaire') }}" {% if view == 'ordinaire' %}class="active" aria-current="page"{% endif %}>Ordinaire<span class="count">{{ counts.user }}</span></a>
-  <a href="{{ url_for('quarantine_page', vue='tout') }}" {% if view == 'tout' %}class="active" aria-current="page"{% endif %}>Tout</a>
+<nav class="segmented" aria-label="Vue">
+  <a href="{{ url_for('quarantine_page', **params(vue='risque', page=1)) }}" {% if f.vue == 'risque' %}class="active" aria-current="page"{% endif %}>{{ icon('alert') }}À examiner<span class="count">{{ counts.admin }}</span></a>
+  <a href="{{ url_for('quarantine_page', **params(vue='ordinaire', page=1)) }}" {% if f.vue == 'ordinaire' %}class="active" aria-current="page"{% endif %}>{{ icon('inbox') }}Ordinaire<span class="count">{{ counts.user }}</span></a>
+  <a href="{{ url_for('quarantine_page', **params(vue='tout', page=1)) }}" {% if f.vue == 'tout' %}class="active" aria-current="page"{% endif %}>Tout<span class="count">{{ counts.admin + counts.user }}</span></a>
 </nav>
-{% if view != 'ordinaire' %}
-<p class="muted small">Les messages à risque (programme malveillant, hameçonnage, fraude, usurpation, score très élevé) ne sont
-  visibles et gérables que par un administrateur ; leurs destinataires n'en voient pas le contenu.</p>
+
+{% set advanced = f.dest or f.exp or f.motif or f.regle or f.smin is not none or f.smax is not none or f.tri %}
+<form method="get" action="{{ url_for('quarantine_page') }}" class="filters card">
+  <input type="hidden" name="vue" value="{{ f.vue }}">
+  <div class="filter-main">
+    <label class="search">{{ icon('search') }}<input type="search" name="q" value="{{ f.q }}" maxlength="100" placeholder="Rechercher : expéditeur, destinataire, objet, identifiant" aria-label="Recherche"></label>
+    <select name="periode" aria-label="Période">{% for key, name in periods %}<option value="{{ key }}" {% if key == f.periode %}selected{% endif %}>{{ name }}</option>{% endfor %}</select>
+    <button type="submit" class="primary">{{ icon('filter') }}Filtrer</button>
+    {% if has_filters %}<a class="btn" href="{{ url_for('quarantine_page', vue=f.vue) }}">{{ icon('x') }}Réinitialiser</a>{% endif %}
+  </div>
+  <details class="more" {% if advanced %}open{% endif %}>
+    <summary>Filtres avancés</summary>
+    <div class="filter-grid">
+      <label>Destinataire<input name="dest" value="{{ f.dest }}" maxlength="100" placeholder="marie@"></label>
+      <label>Expéditeur<input name="exp" value="{{ f.exp }}" maxlength="100" placeholder="domaine ou adresse"></label>
+      <label>Motif de risque<select name="motif"><option value="">Tous</option>{% for r in reasons %}<option value="{{ r }}" {% if r|lower == f.motif|lower %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+      <label>Règle déclenchée<input name="regle" value="{{ f.regle }}" maxlength="60" placeholder="R_SPF_FAIL"></label>
+      <label>Score minimal<input name="smin" type="number" step="0.5" value="{{ f.smin if f.smin is not none else '' }}"></label>
+      <label>Score maximal<input name="smax" type="number" step="0.5" value="{{ f.smax if f.smax is not none else '' }}"></label>
+      <label>Tri<select name="tri"><option value="">Par défaut</option>{% for key, name in sorts %}<option value="{{ key }}" {% if key == f.tri %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
+    </div>
+  </details>
+</form>
+
+{% if f.vue != 'ordinaire' %}
+<p class="muted small hint">Les messages à examiner (programme malveillant, hameçonnage, fraude, usurpation, score très élevé) sont réservés à
+  l'administrateur : leurs destinataires n'en voient pas le contenu. Ouvrez un message pour l'analyser avant toute décision.</p>
 {% endif %}
 
-{% if not messages and not error %}<section class="card empty">Aucun message dans cette vue.</section>{% endif %}
-{% for m in messages %}
-{% set risky = m.get('class') != 'user' %}
-<section class="card msg {{ 'risk-high' if risky else 'risk-ord' }}">
-  <header>
-    <h2>{{ m.subject or '(sans objet)' }}</h2>
-    {% if risky %}<span class="pill risk-high">À examiner</span>{% else %}<span class="pill risk-ord">Courrier indésirable</span>{% endif %}
-  </header>
-  <p class="meta">{{ m.from or m.sender }} → {{ m.recipients | join(', ') }} · {{ m.arrived | int | timestamp }} · {{ (m.size / 1024) | round(1) }} Ko</p>
-  {% if risky and m.danger %}<div class="chips">{% for d in m.danger %}<span class="pill risk-high">{{ d }}</span>{% endfor %}</div>{% endif %}
-  {% if m.ai %}<p><strong>Analyse IA :</strong> {{ m.ai }}</p>{% endif %}
-  <details {% if risky %}open{% endif %}>
-    <summary>Détails techniques</summary>
-    <dl class="facts">
-      <dt>Expéditeur (enveloppe)</dt><dd>{{ m.sender }}</dd>
-      <dt>Score</dt><dd>{{ m.score if m.score is not none else '?' }}</dd>
-      {% if m.symbols %}<dt>Règles</dt><dd>{{ m.symbols | join(', ') }}</dd>{% endif %}
-      <dt>Identifiant</dt><dd>{{ m.id }}</dd>
-    </dl>
-  </details>
-  <div class="actions">
-    <form method="post" action="{{ url_for('quarantine_action', action='release') }}" class="release">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="queue_id" value="{{ m.id }}">
-      {% if risky %}
-        <label class="confirm"><input type="checkbox" name="confirm" required> J'ai analysé ce message et confirme qu'il est sans danger</label>
-        <button type="submit" name="learn" value="0" class="release-danger">Libérer après analyse</button>
-      {% else %}
-        <button type="submit" name="learn" value="1" class="primary" title="Libère le message et apprend qu'il est légitime">Légitime : libérer</button>
-        <button type="submit" name="learn" value="0" title="Libère sans modifier l'apprentissage">Libérer seulement</button>
-      {% endif %}
-    </form>
-    <form method="post" action="{{ url_for('quarantine_action', action='delete') }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="queue_id" value="{{ m.id }}">
-      <button type="submit" name="learn" value="1" class="danger" title="Supprime le message et apprend que c'est du spam">{{ 'Confirmer le danger : supprimer' if risky else 'Spam : supprimer' }}</button>
-      {% if not risky %}<button type="submit" name="learn" value="0" class="danger" title="Supprime sans modifier l'apprentissage">Supprimer seulement</button>{% endif %}
-    </form>
+{% if not messages and not error %}<section class="card empty">Aucun message ne correspond à ces critères.</section>{% endif %}
+{% if messages %}
+<form method="post" action="{{ url_for('quarantine_bulk') }}" class="bulk" data-bulk>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% for key, value in params(page=1).items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+  <div class="toolbar">
+    <span class="muted small"><span data-selected>0</span> sélectionné(s) · seul le courrier ordinaire peut être traité en lot</span>
+    <span class="spacer"></span>
+    <button type="submit" name="action" value="release" class="primary" data-needs-selection disabled>{{ icon('unlock') }}Légitime : libérer</button>
+    <button type="submit" name="action" value="delete" class="danger" data-needs-selection disabled>{{ icon('trash') }}Spam : supprimer</button>
+    <input type="hidden" name="learn" value="1">
   </div>
-</section>
-{% endfor %}
+  <section class="card tablecard">
+    <div class="scroll">
+    <table class="list">
+      <thead><tr>
+        <th class="chk"><input type="checkbox" data-select-all aria-label="Tout sélectionner"></th>
+        <th>Niveau</th><th>Reçu</th><th>Expéditeur</th><th class="col-to">Destinataire</th><th>Objet</th><th>Score</th><th class="col-why">Motif</th><th class="act"></th>
+      </tr></thead>
+      <tbody>
+      {% for m in messages %}
+      {% set risky = m.get('class') != 'user' %}
+      <tr class="{{ 'risk-high' if risky else 'risk-ord' }}">
+        <td class="chk">{% if not risky %}<input type="checkbox" name="queue_id" value="{{ m.id }}" data-row aria-label="Sélectionner {{ m.subject }}">{% endif %}</td>
+        <td>{% if risky %}<span class="pill risk-high">À examiner</span>{% else %}<span class="pill risk-ord">Ordinaire</span>{% endif %}</td>
+        <td class="nowrap num">{{ m.arrived | int | shortdate }}</td>
+        <td class="trunc" title="{{ m.from or m.sender }}">{{ m.from or m.sender }}</td>
+        <td class="trunc col-to" title="{{ m.recipients | join(', ') }}">{{ m.recipients[0] if m.recipients else '' }}{% if m.recipients|length > 1 %} <span class="muted">+{{ m.recipients|length - 1 }}</span>{% endif %}</td>
+        <td class="trunc subj"><a href="{{ url_for('quarantine_detail', queue_id=m.id, **params()) }}">{{ m.subject or '(sans objet)' }}</a></td>
+        <td>{{ score_chip(m.score, thresholds) }}</td>
+        <td class="col-why">{% if m.danger %}<span class="pill risk-high" title="{{ m.danger | join(' · ') }}">{{ m.danger[0] }}</span>{% if m.danger|length > 1 %} <span class="muted small">+{{ m.danger|length - 1 }}</span>{% endif %}{% endif %}</td>
+        <td class="nowrap act"><a class="btn small-btn icon-btn" title="Analyser ce message" aria-label="Analyser {{ m.subject }}" href="{{ url_for('quarantine_detail', queue_id=m.id, **params()) }}">{{ icon('eye') }}</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+</form>
+{{ pagination(pager, url_for('quarantine_page', **params(page=pager.page - 1)), url_for('quarantine_page', **params(page=pager.page + 1))) }}
+{% endif %}
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='list.js') }}"></script>{% endblock %}

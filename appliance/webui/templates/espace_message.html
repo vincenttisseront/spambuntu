@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set portal = True %}
+{% block title %}{{ m.subject or 'Message' }} · Spambuntu{% endblock %}
+{% block content %}
+<h1>Message retenu</h1>
+<a class="btn back" href="{{ url_for('user_messages', token=token) }}">{{ icon('arrow-left') }}Retour à mes messages</a>
+<section class="card msg risk-ord">
+  <header>
+    <h2 class="detail-title">{{ m.subject or '(sans objet)' }}</h2>
+    <span class="pill risk-ord">Courrier indésirable probable</span>
+  </header>
+  <dl class="facts">
+    <dt>De</dt><dd>{{ m.from }}</dd>
+    <dt>Reçu le</dt><dd>{{ m.arrived | timestamp }}</dd>
+    <dt>Taille</dt><dd>{{ m.size | size }}</dd>
+  </dl>
+  <p class="small muted">Ce message a été retenu car il ressemble à de la publicité ou à du courrier non sollicité.
+    Aucun signe de programme malveillant ni de fraude n'a été détecté.</p>
+  {% if m.excerpt %}
+  <h3>Début du message <span class="muted small">(texte seul)</span></h3>
+  <pre class="preview">{{ m.excerpt }}</pre>
+  {% endif %}
+  <div class="actions">
+    <form method="post" action="{{ url_for('user_action', token=token, action='release') }}">
+      <input type="hidden" name="queue_id" value="{{ m.id }}">
+      <button type="submit" class="primary">{{ icon('unlock') }}Libérer ce message</button>
+    </form>
+    {% if m.single %}
+    <form method="post" action="{{ url_for('user_action', token=token, action='delete') }}">
+      <input type="hidden" name="queue_id" value="{{ m.id }}">
+      <button type="submit" class="danger">{{ icon('trash') }}Supprimer</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+<p class="muted small">Ne libérez que les messages que vous attendiez et dont vous reconnaissez l'expéditeur. Ce lien vous est personnel : ne le transmettez pas.</p>
+{% endblock %}

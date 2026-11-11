@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_macros.html" import gauge_svg %}
+{% set risky = m['class'] != 'user' %}
+{% block title %}{{ m.headers.subject or 'Message' }} · Quarantaine · Spambuntu{% endblock %}
+{% block content %}
+<h1>Analyse du message</h1>
+<a class="btn back" href="{{ url_for('quarantine_page', **back) }}">{{ icon('arrow-left') }}Retour à la liste</a>
+
+<header class="detail-head {{ 'risk-high' if risky else 'risk-ord' }}">
+  <div>
+    <h2 class="detail-title">{{ m.headers.subject or '(sans objet)' }}</h2>
+    <p class="muted">{{ m.headers.from or m.sender }} → {{ m.recipients | join(', ') }}</p>
+  </div>
+  {% if risky %}<span class="pill risk-high big">{{ icon('alert') }}À examiner par l'administrateur</span>{% else %}<span class="pill risk-ord big">Courrier indésirable ordinaire</span>{% endif %}
+</header>
+
+<div class="detail">
+  <div class="detail-main">
+    <section class="card">
+      <h2>Verdict</h2>
+      {% if risky and m.danger %}<div class="chips">{% for d in m.danger %}<span class="pill risk-high">{{ d }}</span>{% endfor %}</div>{% endif %}
+      <div class="gauge-row">
+        {{ gauge_svg(gauge) }}
+        <p class="small muted">Score <strong class="text-strong">{{ m.score if m.score is not none else '?' }}</strong> · marquage {{ th.tag }} · quarantaine {{ th.quarantine }} · rejet {{ th.reject }}</p>
+      </div>
+      {% if m.ai %}
+      <h3>Analyse de l'intention (IA)</h3>
+      <p>{{ m.ai }}</p>
+      {% if m.ai_flags %}<div class="chips">{% for flag in m.ai_flags %}<span class="pill">{{ flag }}</span>{% endfor %}</div>{% endif %}
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Règles déclenchées <span class="muted small">({{ weighted | length }} avec effet sur le score)</span></h2>
+      {% if weighted %}
+      <div class="scroll"><table class="rules">
+        <thead><tr><th>Famille</th><th>Règle</th><th>Détail</th><th class="r">Points</th></tr></thead>
+        <tbody>
+        {% for r in weighted %}
+          <tr><td><span class="pill fam">{{ r.category }}</span></td>
+            <td><code>{{ r.name }}</code>{% if r.text %}<br><span class="muted small">{{ r.text }}</span>{% endif %}</td>
+            <td class="small mono">{{ r.options }}</td>
+            <td class="r num {{ 'plus' if r.score > 0 else 'minus' }}">{{ '%+.2f' % r.score }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% else %}<p class="muted">Aucune règle n'a modifié le score.</p>{% endif %}
+      {% if neutral %}
+      <details><summary>{{ neutral | length }} règle(s) sans effet sur le score</summary>
+        <p class="small mono">{% for r in neutral %}{{ r.name }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+      </details>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Contenu</h2>
+      {% if m.preview.skipped %}<p class="muted">Message trop volumineux : aucun aperçu.</p>
+      {% elif m.preview.text %}
+      <pre class="preview">{{ m.preview.text }}</pre>
+      {% if m.preview.truncated %}<p class="muted small">Aperçu tronqué.</p>{% endif %}
+      {% else %}<p class="muted">Aucun texte lisible.</p>{% endif %}
+      <p class="muted small">Aperçu en texte seul : le contenu actif (scripts, images distantes, liens) n'est jamais exécuté ni chargé.</p>
+      {% if m.preview.attachments %}
+      <h3>{{ icon('paperclip') }}Pièces jointes</h3>
+      <table class="rules"><thead><tr><th>Nom</th><th>Type</th><th class="r">Taille</th></tr></thead><tbody>
+        {% for a in m.preview.attachments %}<tr><td class="mono small">{{ a.name }}</td><td class="small">{{ a.type }}</td><td class="r num small">{{ a.size | size }}</td></tr>{% endfor %}
+      </tbody></table>
+      {% endif %}
+      {% if m.preview.links %}
+      <h3>{{ icon('link') }}Liens trouvés <span class="muted small">(neutralisés : non cliquables)</span></h3>
+      <ul class="links">{% for l in m.preview.links %}<li class="mono small">{{ l }}</li>{% endfor %}</ul>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>En-têtes et enveloppe</h2>
+      <dl class="facts">
+        <dt>De (affiché)</dt><dd>{{ m.headers.from }}</dd>
+        <dt>Expéditeur (enveloppe)</dt><dd>{{ m.sender }}</dd>
+        {% if m.headers.reply_to %}<dt>Répondre à</dt><dd>{{ m.headers.reply_to }}</dd>{% endif %}
+        {% if m.headers.return_path %}<dt>Return-Path</dt><dd>{{ m.headers.return_path }}</dd>{% endif %}
+        <dt>À (affiché)</dt><dd>{{ m.headers.to }}</dd>
+        <dt>Destinataires (enveloppe)</dt><dd>{{ m.recipients | join(', ') }}</dd>
+        <dt>Date</dt><dd>{{ m.headers.date }}</dd>
+        <dt>Message-ID</dt><dd>{{ m.headers.message_id }}</dd>
+        <dt>Reçu le</dt><dd>{{ m.arrived | timestamp }}</dd>
+        <dt>Taille</dt><dd>{{ m.size | size }}</dd>
+        <dt>Identifiant de file</dt><dd>{{ m.id }}</dd>
+      </dl>
+      <p class="small"><a href="{{ url_for('journal_trace', id=m.id) }}">Voir le parcours dans le journal →</a></p>
+    </section>
+  </div>
+
+  <aside class="detail-aside">
+    <section class="card sticky">
+      <h2>Décision</h2>
+      {% macro hidden() %}{% for key, value in back.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}{% endmacro %}
+      <form method="post" action="{{ url_for('quarantine_action', action='release') }}" class="stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="queue_id" value="{{ m.id }}">{{ hidden() }}
+        {% if risky %}
+          <label class="confirm"><input type="checkbox" name="confirm" required> J'ai analysé ce message et confirme qu'il est sans danger</label>
+          <button type="submit" name="learn" value="0" class="release-danger wide">{{ icon('unlock') }}Libérer après analyse</button>
+        {% else %}
+          <button type="submit" name="learn" value="1" class="primary wide" title="Libère le message et apprend qu'il est légitime">{{ icon('unlock') }}Légitime : libérer</button>
+          <button type="submit" name="learn" value="0" class="wide" title="Libère sans modifier l'apprentissage">Libérer seulement</button>
+        {% endif %}
+      </form>
+      <form method="post" action="{{ url_for('quarantine_action', action='delete') }}" class="stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="queue_id" value="{{ m.id }}">{{ hidden() }}
+        <button type="submit" name="learn" value="1" class="danger wide" title="Supprime le message et apprend que c'est du spam">{{ icon('trash') }}{{ 'Confirmer le danger : supprimer' if risky else 'Spam : supprimer' }}</button>
+        {% if not risky %}<button type="submit" name="learn" value="0" class="danger wide" title="Supprime sans modifier l'apprentissage">Supprimer seulement</button>{% endif %}
+      </form>
+      <p class="muted small">Chaque décision est journalisée. « Légitime » et « Spam » entraînent aussi le filtre bayésien.</p>
+    </section>
+  </aside>
+</div>
+{% endblock %}

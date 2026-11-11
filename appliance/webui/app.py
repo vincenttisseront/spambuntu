@@ -29,6 +29,8 @@ import spambuntu_ai as aicfg  # noqa: E402
 import spambuntu_digest as digest  # noqa: E402
 import spambuntu_mail as mailcfg  # noqa: E402
 import spambuntu_quarantine as quarantine  # noqa: E402
+import spambuntu_symbols as symdoc  # noqa: E402
+import listing  # noqa: E402
 import spambuntu_update as upd  # noqa: E402
 
 try:
@@ -47,6 +49,7 @@ QUARANTINE_BIN = "/usr/local/sbin/spambuntu-quarantine"
 STATS_BIN = "/usr/local/sbin/spambuntu-mailstats"
 STATS_WINDOWS = {"24": 24, "72": 72, "168": 168}
 JOURNAL_CATEGORIES = ("delivered", "tagged", "quarantined", "rejected", "deferred")
+ACTION_LABELS = {"delivered": "Livré", "tagged": "Marqué", "quarantined": "Quarantaine", "rejected": "Rejeté", "deferred": "Différé"}
 JOURNAL_QUERY_RE = re.compile(r"[\w@.+\-:\[\] ]{1,100}")
 
 
@@ -135,6 +138,16 @@ def parse_mail_form(form) -> dict:
             raise mailcfg.MailError(f"Ligne {number} : format attendu « domaine.tld serveur[:port] »")
         domains.append({"name": parts[0], "relay": parts[1]})
     networks = [n.strip() for n in (form.get("trusted_networks") or "").replace(",", "\n").splitlines() if n.strip()]
+    vip = []
+    for number, line in enumerate((form.get("vip") or "").splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        name, sep, address = line.rpartition(";")
+        if not sep:
+            raise mailcfg.MailError(f"Dirigeant, ligne {number} : format attendu « Prénom Nom ; adresse@domaine »")
+        vip.append({"name": name.strip(), "address": address.strip()})
+    brands = [b.strip() for b in (form.get("brand_domains") or "").replace(",", "\n").splitlines() if b.strip()]
     return {
         "hostname": (form.get("hostname") or "").strip(),
         "domains": domains,
@@ -147,6 +160,10 @@ def parse_mail_form(form) -> dict:
         "digest_from": (form.get("digest_from") or "").strip(),
         "digest_base_url": (form.get("digest_base_url") or "").strip().rstrip("/"),
         "digest_release_max_score": form.get("digest_release_max_score") or "10",
+        "identity_enabled": form.get("identity_enabled") == "on",
+        "vip": vip,
+        "brand_domains": brands,
+        "dmarc_action": form.get("dmarc_action") or "reject",
     }
 
 
@@ -212,6 +229,19 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         if request.path.startswith("/api/") or request.path in ("/login", "/healthz"):
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    @app.template_filter("action_label")
+    def action_label_filter(value):
+        return ACTION_LABELS.get(value, value)
+
+    @app.template_filter("shortdate")
+    def shortdate_filter(value):
+        return time.strftime("%d/%m %H:%M", time.localtime(int(value))) if value else "?"
+
+    @app.template_filter("size")
+    def size_filter(value):
+        n = int(value or 0)
+        return f"{n} o" if n < 1024 else (f"{n / 1024:.0f} Ko" if n < 1024 * 1024 else f"{n / 1024 / 1024:.1f} Mo")
 
     @app.template_filter("timestamp")
     def timestamp_filter(value):
@@ -286,26 +316,50 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
     @app.get("/journal")
     @login_required
     def journal_page():
-        query = (request.args.get("q") or "").strip()
         category = request.args.get("action", "")
         hours = request.args.get("hours", "24")
-        error = None
         if hours not in STATS_WINDOWS:
             hours = "24"
         if category and category not in JOURNAL_CATEGORIES:
             category = ""
-        if query and not JOURNAL_QUERY_RE.fullmatch(query):
-            error, query = "Recherche invalide : lettres, chiffres et @ . + - : uniquement.", ""
-        args = ["search", "--hours", hours, "--limit", "200"]
-        if query:
-            args += ["--q", query]
-        if category:
-            args += ["--action", category]
+        f = {"q": listing.text_arg(request.args, "q"), "sender": listing.text_arg(request.args, "sender"),
+             "rcpt": listing.text_arg(request.args, "rcpt"), "ip": listing.text_arg(request.args, "ip", 45),
+             "symbol": listing.text_arg(request.args, "regle", 60), "smin": listing.number_arg(request.args, "smin"),
+             "smax": listing.number_arg(request.args, "smax"), "action": category, "hours": hours, "page": listing.page_arg(request.args)}
+        error = None
+        for key in ("q", "sender", "rcpt", "ip", "symbol"):
+            if f[key] and not JOURNAL_QUERY_RE.fullmatch(f[key]):
+                error, f[key] = "Recherche invalide : lettres, chiffres et @ . + - : uniquement.", ""
+        args = ["search", "--hours", hours, "--limit", "500"]
+        for key, flag in (("q", "--q"), ("sender", "--sender"), ("rcpt", "--rcpt"), ("ip", "--ip"), ("symbol", "--symbol"), ("action", "--action")):
+            if f[key]:
+                args += [flag, f[key]]
+        for key, flag in (("smin", "--min-score"), ("smax", "--max-score")):
+            if f[key] is not None:
+                args += [flag, str(f[key])]
         result = app.config["STATS_RUNNER"](args)
         if not result.get("ok"):
             error = error or result.get("error")
-        return render_template("journal.html", active="journal", records=result.get("records", []), error=error,
-                               q=query, category=category, hours=hours, categories=JOURNAL_CATEGORIES)
+        records, pager = listing.paginate(result.get("records", []), f["page"])
+        defaults = {"hours": "24", "page": 1}
+        keep = lambda **over: {k: v for k, v in {**f, **over}.items() if v not in (None, "") and defaults.get(k) != v}  # noqa: E731
+        return render_template("journal.html", active="journal", records=records, error=error, f=f, pager=pager, keep=keep,
+                               categories=JOURNAL_CATEGORIES, windows=STATS_WINDOWS)
+
+    @app.get("/journal/trace")
+    @login_required
+    def journal_trace():
+        ident = (request.args.get("id") or "").strip()
+        if not re.fullmatch(r"[\w.@+\-=%$#/!*]{3,200}", ident):
+            abort(404)
+        result = app.config["STATS_RUNNER"](["trace", ident])
+        error = None if result.get("ok") else (result.get("error") or "Trace indisponible")
+        verdicts = result.get("verdicts", []) if not error else []
+        for verdict in verdicts:
+            for sym in verdict.get("sym_all", []):
+                sym["category"], sym["text"] = symdoc.describe(sym["name"])
+        return render_template("journal_trace.html", active="journal", ident=ident, error=error, verdicts=verdicts,
+                               delivery=result.get("delivery", []) if not error else [])
 
     @app.get("/system/update")
     @login_required
@@ -335,7 +389,9 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         pending = (mail_state_dir() / "mail-request.json").exists()
         return render_template("messagerie.html", active="mail", cfg=current, status=status, pending=pending,
                                domains_text="\n".join(f"{d['name']} {d['relay']}" for d in current["domains"]),
-                               networks_text="\n".join(current["trusted_networks"]))
+                               networks_text="\n".join(current["trusted_networks"]),
+                               vip_text="\n".join(f"{v['name']} ; {v['address']}" for v in current["vip"]),
+                               brands_text="\n".join(current["brand_domains"]), builtin_brands=mailcfg.BUILTIN_BRANDS)
 
     @app.post("/messagerie")
     @login_required
@@ -406,8 +462,34 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         result = app.config["QUARANTINE_RUNNER"](["list", "--recipient", rcpt, "--max-score", str(user_limit())])
         if not result.get("ok"):
             return user_page(502, error="Impossible de lire vos messages pour le moment.", messages=[], blocked=0, rcpt=rcpt, token=token)
-        return user_page(200, error=None, messages=result.get("messages", []), blocked=int(result.get("blocked", 0)),
-                         rcpt=rcpt, token=token)
+        f = {"q": listing.text_arg(request.args, "q"), "periode": request.args.get("periode", "tout"), "page": listing.page_arg(request.args)}
+        if f["periode"] not in listing.PERIODS:
+            f["periode"] = "tout"
+        needle, horizon = f["q"].lower(), listing.PERIODS[f["periode"]]
+        mine = [m for m in result.get("messages", [])
+                if (not needle or needle in (str(m.get("from", "")) + " " + str(m.get("subject", ""))).lower())
+                and (not horizon or int(m.get("arrived", 0)) >= time.time() - horizon)]
+        mine.sort(key=lambda m: -int(m.get("arrived", 0)))
+        page_items, pager = listing.paginate(mine, f["page"])
+        params = lambda **over: {k: v for k, v in {**f, **over}.items() if v not in ("", None) and {"periode": "tout", "page": 1}.get(k) != v}  # noqa: E731
+        return user_page(200, error=None, messages=page_items, total_all=len(result.get("messages", [])), blocked=int(result.get("blocked", 0)),
+                         rcpt=rcpt, token=token, f=f, pager=pager, params=params, periods=listing.PERIOD_NAMES)
+
+    @app.get("/mes-messages/<token>/message/<queue_id>")
+    def user_message(token, queue_id):
+        try:
+            _, rcpt = digest.verify_token(secret, token, scope="l")
+        except digest.DigestError as exc:
+            return user_page(400, error=str(exc), messages=[], blocked=0, rcpt="", token="", f={}, pager=None, params=None, periods=(), total_all=0)
+        if not quarantine.QUEUE_ID_RE.fullmatch(queue_id):
+            abort(404)
+        result = app.config["QUARANTINE_RUNNER"](["show", queue_id, "--recipient", rcpt, "--max-score", str(user_limit())])
+        if not result.get("ok"):
+            flash("error", "Ce message n'est plus disponible dans votre espace")
+            return redirect(url_for("user_messages", token=token))
+        response = app.make_response(render_template("espace_message.html", m=result["message"], rcpt=rcpt, token=token))
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.post("/mes-messages/<token>/<action>")
     def user_action(token, action):
@@ -464,22 +546,75 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
             flash("success", "Configuration envoyée : application et test de connexion en cours…")
         return redirect(url_for("ai_page"))
 
+    def mail_thresholds() -> dict:
+        try:
+            return mailcfg.load_config(Path(app.config["MAIL_CONF"]))["thresholds"]
+        except mailcfg.MailError:
+            return dict(mailcfg.DEFAULTS["thresholds"])
+
     @app.get("/quarantaine")
     @login_required
     def quarantine_page():
-        view = request.args.get("vue", "risque")
-        if view not in ("risque", "ordinaire", "tout"):
-            view = "risque"
+        f = listing.quarantine_filters(request.args)
+        base = dict(active="quarantine", f=f, params=lambda **over: listing.url_params(f, **over), periods=listing.PERIOD_NAMES,
+                    sorts=listing.QUARANTINE_SORTS, thresholds=mail_thresholds(),
+                    has_filters=bool(set(listing.url_params(f, page=1)) - {"vue"}))
         result = app.config["QUARANTINE_RUNNER"](["list"])
         if not result.get("ok"):
-            return render_template("quarantaine.html", active="quarantine", messages=[], error=result.get("error"),
-                                   view=view, counts={"admin": 0, "user": 0})
+            return render_template("quarantaine.html", messages=[], error=result.get("error"), counts={"admin": 0, "user": 0},
+                                   pager=listing.paginate([], 1)[1], reasons=[], **base)
         everything = result.get("messages", [])
         counts = {"admin": sum(1 for m in everything if m.get("class") != "user"),
                   "user": sum(1 for m in everything if m.get("class") == "user")}
-        shown = [m for m in everything if view == "tout" or (view == "risque") == (m.get("class") != "user")]
-        shown.sort(key=lambda m: (m.get("class") == "user", -int(m.get("arrived", 0))))
-        return render_template("quarantaine.html", active="quarantine", messages=shown, error=None, view=view, counts=counts)
+        reasons = sorted({d for m in everything for d in m.get("danger", [])})
+        page_items, pager = listing.paginate(listing.filter_quarantine(everything, f), f["page"])
+        return render_template("quarantaine.html", messages=page_items, error=None, counts=counts, pager=pager, reasons=reasons, **base)
+
+    @app.get("/quarantaine/message/<queue_id>")
+    @login_required
+    def quarantine_detail(queue_id):
+        if not quarantine.QUEUE_ID_RE.fullmatch(queue_id):
+            abort(404)
+        f = listing.quarantine_filters(request.args)
+        result = app.config["QUARANTINE_RUNNER"](["show", queue_id])
+        if not result.get("ok"):
+            flash("error", result.get("error") or "Message introuvable")
+            return redirect(url_for("quarantine_page", **listing.url_params(f)))
+        m = result["message"]
+        rows = []
+        for sym in m.get("symbols", []):
+            category, text = symdoc.describe(sym["name"])
+            rows.append({**sym, "category": category, "text": text})
+        th = mail_thresholds()
+        return render_template("quarantaine_detail.html", active="quarantine", m=m, th=th, gauge=listing.gauge(m.get("score"), th),
+                               weighted=[r for r in rows if r["score"] != 0], neutral=[r for r in rows if r["score"] == 0],
+                               f=f, back=listing.url_params(f))
+
+    @app.post("/quarantaine/lot")
+    @login_required
+    def quarantine_bulk():
+        action = request.form.get("action", "")
+        ids = list(dict.fromkeys(request.form.getlist("queue_id")))[:100]
+        back = listing.url_params(listing.quarantine_filters(request.form))
+        if action not in ("release", "delete") or not ids or not all(quarantine.QUEUE_ID_RE.fullmatch(i) for i in ids):
+            flash("error", "Sélectionnez au moins un message")
+            return redirect(url_for("quarantine_page", **back))
+        done, errors = 0, []
+        for queue_id in ids:
+            args = [action, queue_id, "--actor", session.get("user", "console")]
+            if request.form.get("learn") == "1":
+                args.append("--learn")
+            result = app.config["QUARANTINE_RUNNER"](args)
+            if result.get("ok"):
+                done += 1
+            else:
+                errors.append(result.get("error") or "Échec")
+        verb = "libéré(s)" if action == "release" else "supprimé(s)"
+        if errors:
+            flash("error", f"{done} message(s) {verb}, {len(errors)} refusé(s) : {errors[0]}")
+        else:
+            flash("success", f"{done} message(s) {verb}")
+        return redirect(url_for("quarantine_page", **back))
 
     @app.post("/quarantaine/<action>")
     @login_required
@@ -497,7 +632,7 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
             args.append("--confirm-danger")
         result = app.config["QUARANTINE_RUNNER"](args)
         flash("success" if result.get("ok") else "error", result.get("message") or result.get("error") or "Échec")
-        return redirect(url_for("quarantine_page"))
+        return redirect(url_for("quarantine_page", **listing.url_params(listing.quarantine_filters(request.form))))
 
     # ------------------------------------------------------------------ API des mises à jour
 

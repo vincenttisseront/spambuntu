@@ -34,6 +34,25 @@
     rejeté plus tard vers un expéditeur souvent usurpé. Désactivez-le si votre serveur accepte tout destinataire
     sur le moment (il ne doit pas répondre « 250 » à une adresse inconnue).</p>
 
+  <h2>Protection contre l'usurpation</h2>
+  <label class="check"><input type="checkbox" name="identity_enabled" {% if cfg.identity_enabled %}checked{% endif %}> Détecter les usurpations d'identité (dirigeants, domaines imitateurs, caractères trompeurs)</label>
+  <label>Dirigeants à protéger, un par ligne : <code>Prénom Nom ; adresse@domaine</code>
+    <textarea name="vip" rows="4" spellcheck="false" autocomplete="off" placeholder="Jean Dupont ; jean.dupont@exemple.fr">{{ vip_text }}</textarea></label>
+  <p class="muted small">Un message dont le nom d'affichage est celui d'un dirigeant mais qui vient d'une autre adresse externe
+    (« Jean Dupont - PDG » depuis une boîte gratuite) est retenu et réservé à l'administrateur.</p>
+  <label>Domaines de marques à protéger en plus de la liste intégrée, un par ligne
+    <textarea name="brand_domains" rows="3" spellcheck="false" autocomplete="off" placeholder="banque-exemple.fr">{{ brands_text }}</textarea></label>
+  <p class="muted small">Vos propres domaines et {{ builtin_brands|length }} marques courantes (Microsoft, Google, PayPal, impots.gouv.fr…) sont surveillés :
+    un expéditeur dont le domaine leur ressemble (<code>micr0soft.com</code>, <code>exemple.co</code>, lettres cyrilliques…) est retenu.</p>
+  <label>Échec d'une politique DMARC « reject » de l'expéditeur
+    <select name="dmarc_action">
+      <option value="reject" {% if cfg.dmarc_action == 'reject' %}selected{% endif %}>Rejet immédiat à l'expéditeur (recommandé)</option>
+      <option value="quarantine" {% if cfg.dmarc_action == 'quarantine' %}selected{% endif %}>Retenir pour analyse par l'administrateur</option>
+      <option value="score" {% if cfg.dmarc_action == 'score' %}selected{% endif %}>Ajouter seulement des points au score</option>
+    </select></label>
+  <p class="muted small">Le propriétaire du domaine expéditeur a demandé le refus des messages qui échouent à SPF et DKIM : le rejet
+    respecte sa politique. Choisissez la rétention si vous voulez examiner ces messages avant tout refus.</p>
+
   <h2>Avancé</h2>
   <div class="grid">
     <label>Nom d'hôte de la passerelle<input name="hostname" value="{{ cfg.hostname }}" placeholder="(nom du système)" autocomplete="off"></label>

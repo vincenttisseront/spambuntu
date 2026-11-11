@@ -2,6 +2,7 @@
 """Gestion de la quarantaine (file « hold » de Postfix) pour la console web.
 
   spambuntu-quarantine list [--limit N] [--recipient ADRESSE]
+  spambuntu-quarantine show IDENTIFIANT [--recipient ADRESSE] [--max-score N]
   spambuntu-quarantine release IDENTIFIANT [--actor NOM] [--learn] [--recipient ADRESSE] [--max-score N] [--confirm-danger]
   spambuntu-quarantine delete  IDENTIFIANT [--actor NOM] [--learn] [--recipient ADRESSE]
 
@@ -18,7 +19,10 @@ Sortie : JSON sur la sortie standard. Chaque action est journalisée.
 from __future__ import annotations
 
 import argparse
+import email
 import email.header
+import email.policy
+import html.parser
 import json
 import re
 import subprocess
@@ -33,6 +37,11 @@ QUEUE_ID_RE = re.compile(r"[0-9A-Za-z]{6,25}")
 ACTOR_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
 MAX_LIST = 500
 HEADER_BYTES = 8192
+PREVIEW_MAX_BYTES = 5 * 1024 * 1024        # au-delà, pas d'aperçu du contenu
+PREVIEW_CHARS = 4000
+USER_PREVIEW_CHARS = 600
+SPAMD_SYMBOL_RE = re.compile(r"([A-Z][A-Z0-9_]{2,})\((-?\d+(?:\.\d+)?)\)(?:\[([^\]]*)\])?")
+URL_RE = re.compile(r"https?://[^\s<>\"'()\[\]]{4,300}", re.I)
 
 
 class QuarantineError(Exception):
@@ -98,6 +107,8 @@ DANGER_SYMBOLS = (  # (motif de règle Rspamd, libellé)
     (re.compile(r"PHISH"), "Hameçonnage"),
     (re.compile(r"MACRO|EXECUTABLE|BAD_EXTENSION|ARCHIVE_IN_ARCHIVE|ENCRYPTED"), "Pièce jointe dangereuse"),
     (re.compile(r"DMARC_POLICY_REJECT"), "Usurpation de domaine"),
+    (re.compile(r"SPAMBUNTU_VIP_SPOOF|SPOOF_DISPLAY_NAME"), "Usurpation d'un dirigeant ou d'un nom d'affichage"),
+    (re.compile(r"SPAMBUNTU_LOOKALIKE|SPAMBUNTU_IDN_HOMOGLYPH"), "Domaine imitateur"),
 )
 
 
@@ -173,6 +184,145 @@ def listing_for_user(recipient: str, run=_run, limit: int = MAX_LIST, max_score=
         messages.append({"id": m["id"], "from": m["from"] or m["sender"], "subject": m["subject"], "arrived": m["arrived"],
                          "size": m["size"], "single": len(m["recipients"]) == 1})
     return {"messages": messages, "blocked": blocked}
+
+
+def spamd_symbols(spamd_result: str, limit: int = 80) -> list:
+    """Toutes les règles de l'en-tête X-Spamd-Result : [{"name", "score", "options"}], les plus lourdes d'abord."""
+    out = []
+    for name, score, options in SPAMD_SYMBOL_RE.findall(spamd_result or ""):
+        out.append({"name": name, "score": float(score), "options": re.sub(r"[\x00-\x1f\x7f]+", " ", options).strip()[:200]})
+    out.sort(key=lambda x: (-abs(x["score"]), x["name"]))
+    return out[:limit]
+
+
+class _Text(html.parser.HTMLParser):
+    """Texte visible et adresses des liens d'un message HTML (jamais rendu : aperçu en texte brut seulement)."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.text, self.links, self._skip = [], [], 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "head"):
+            self._skip += 1
+        elif tag in ("br", "p", "div", "tr", "li"):
+            self.text.append("\n")
+        if tag == "a":
+            href = dict(attrs).get("href") or ""
+            if URL_RE.match(href):
+                self.links.append(href)
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "head") and self._skip:
+            self._skip -= 1
+
+    def handle_data(self, data):
+        if not self._skip:
+            self.text.append(data)
+
+
+def defang(url: str) -> str:
+    """Adresse affichée de façon inoffensive (non cliquable, schéma neutralisé)."""
+    return re.sub(r"^http", "hxxp", url[:200], flags=re.I)
+
+
+def content_preview(raw: bytes, chars: int, with_links: bool = True) -> dict:
+    """Aperçu borné du contenu : texte brut, pièces jointes, liens neutralisés. Aucun contenu actif n'est conservé."""
+    out = {"text": "", "truncated": False, "attachments": [], "links": []}
+    try:
+        msg = email.message_from_bytes(raw, policy=email.policy.default)
+        body = msg.get_body(preferencelist=("plain", "html"))
+        text, links = "", []
+        if body is not None:
+            content = body.get_content()
+            if body.get_content_type() == "text/html":
+                parser = _Text()
+                parser.feed(content[:200000])
+                text, links = "".join(parser.text), parser.links
+            else:
+                text = content
+        links = links + URL_RE.findall(text[:200000])
+        text = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", re.sub(r"\n{3,}", "\n\n", text)).strip()
+        out["truncated"] = len(text) > chars
+        out["text"] = text[:chars]
+        if with_links:
+            out["links"] = [defang(u) for u in dict.fromkeys(links)][:20]
+        for part in msg.iter_attachments():
+            payload = part.get_payload(decode=True) or b""
+            out["attachments"].append({"name": decode_header(part.get_filename() or "", 120) or "(sans nom)",
+                                       "type": part.get_content_type()[:80], "size": len(payload)})
+            if len(out["attachments"]) >= 20:
+                break
+    except (ValueError, LookupError, TypeError, AttributeError, KeyError):
+        out["text"] = ""
+    return out
+
+
+def _held_item(queue_id: str, run) -> dict:
+    if not QUEUE_ID_RE.fullmatch(queue_id):
+        raise QuarantineError("Identifiant de message invalide")
+    item = next((d for d in held(run) if d["queue_id"] == queue_id), None)
+    if item is None:
+        raise QuarantineError("Ce message n'est plus en quarantaine")
+    return item
+
+
+def show(queue_id: str, run=_run) -> dict:
+    """Vue d'analyse complète d'un message retenu (administrateur)."""
+    item = _held_item(queue_id, run)
+    head = run(["postcat", "-qh", queue_id])
+    if head.returncode != 0:
+        raise QuarantineError("Lecture du message impossible")
+    raw_head = head.stdout[:65536]
+    fields = headers_of(raw_head)
+    spamd = fields.get("x-spamd-result", "")
+    every = symbols_of(spamd, 200)
+    flags = [x[len("SPAMBUNTU_AI_"):].lower() for x in every if x.startswith("SPAMBUNTU_AI_")]
+    score = score_of(spamd)
+    cls, reasons = classify(every, flags, score)
+    limit = re.search(r"\[-?\d+(?:\.\d+)? / (\d+(?:\.\d+)?)\]", spamd)
+    parsed = email.message_from_bytes(raw_head)
+    header = lambda name, n=300: decode_header(str(parsed.get(name, "")), n)  # noqa: E731
+    size = int(item.get("message_size", 0))
+    preview = {"text": "", "truncated": False, "attachments": [], "links": [], "skipped": size > PREVIEW_MAX_BYTES}
+    if not preview["skipped"]:
+        body = run(["postcat", "-qb", queue_id])
+        if body.returncode == 0:
+            preview.update(content_preview(raw_head + b"\n" + body.stdout[:PREVIEW_MAX_BYTES], PREVIEW_CHARS))
+    return {
+        "id": queue_id, "class": cls, "danger": reasons, "score": score, "reject_limit": float(limit.group(1)) if limit else None,
+        "sender": str(item.get("sender", ""))[:200],
+        "recipients": [str(r.get("address", ""))[:200] for r in item.get("recipients", [])][:50],
+        "size": size, "arrived": int(item.get("arrival_time", 0)),
+        "headers": {"from": header("from"), "to": header("to"), "reply_to": header("reply-to"), "subject": header("subject"),
+                    "date": header("date", 80), "message_id": header("message-id", 200), "return_path": header("return-path", 200)},
+        "symbols": spamd_symbols(spamd), "ai": ai_explanation(spamd), "ai_flags": flags,
+        "preview": preview,
+    }
+
+
+def show_for_user(queue_id: str, recipient: str, run=_run, max_score=None) -> dict:
+    """Détail d'un message ordinaire pour son destinataire : expéditeur, objet, court extrait ; rien de technique."""
+    if not RCPT_RE.fullmatch(recipient):
+        raise QuarantineError("Destinataire invalide")
+    item = _held_item(queue_id, run)
+    recipients = {str(r.get("address", "")).lower() for r in item.get("recipients", [])}
+    head = run(["postcat", "-qh", queue_id])
+    fields = headers_of(head.stdout[:HEADER_BYTES]) if head.returncode == 0 else {}
+    score = score_of(fields.get("x-spamd-result", ""))
+    every = symbols_of(fields.get("x-spamd-result", ""), 200)
+    cls, _ = classify(every, [x[len("SPAMBUNTU_AI_"):].lower() for x in every if x.startswith("SPAMBUNTU_AI_")], score)
+    if recipient.lower() not in recipients or cls != "user" or (max_score is not None and (score is None or score > max_score)):
+        raise QuarantineError("Ce message n'est pas accessible depuis votre espace")
+    size = int(item.get("message_size", 0))
+    text = ""
+    if size <= PREVIEW_MAX_BYTES:
+        body = run(["postcat", "-qb", queue_id])
+        if body.returncode == 0:
+            text = content_preview(head.stdout[:65536] + b"\n" + body.stdout[:PREVIEW_MAX_BYTES], USER_PREVIEW_CHARS, with_links=False)["text"]
+    return {"id": queue_id, "from": decode_header(fields.get("from", "")) or str(item.get("sender", ""))[:200],
+            "subject": decode_header(fields.get("subject", "")), "arrived": int(item.get("arrival_time", 0)), "size": size,
+            "single": len(recipients) == 1, "excerpt": text}
 
 
 def audit(actor: str, action: str, queue_id: str, ok: bool, log_file: Path = LOG_FILE) -> None:
@@ -267,6 +417,10 @@ def main(argv=None) -> int:
     ls.add_argument("--limit", type=int, default=200)
     ls.add_argument("--recipient", default="")
     ls.add_argument("--max-score", type=float, default=None)
+    sh = sub.add_parser("show")
+    sh.add_argument("queue_id")
+    sh.add_argument("--recipient", default="")
+    sh.add_argument("--max-score", type=float, default=None)
     for name in ("release", "delete"):
         p = sub.add_parser(name)
         p.add_argument("queue_id")
@@ -278,7 +432,10 @@ def main(argv=None) -> int:
             p.add_argument("--confirm-danger", action="store_true")
     args = ap.parse_args(argv)
     try:
-        if args.cmd == "list":
+        if args.cmd == "show":
+            data = {"message": show_for_user(args.queue_id, args.recipient, max_score=args.max_score) if args.recipient else show(args.queue_id)}
+            print(json.dumps({"ok": True, **data}, ensure_ascii=False))
+        elif args.cmd == "list":
             limit = max(1, min(args.limit, MAX_LIST))
             data = listing_for_user(args.recipient, limit=limit, max_score=args.max_score) if args.recipient else {"messages": listing(limit=limit)}
             print(json.dumps({"ok": True, **data}, ensure_ascii=False))

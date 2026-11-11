@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_macros.html" import pagination %}
 {% set portal = True %}
 {% block title %}Mes messages retenus · Spambuntu{% endblock %}
 {% block content %}
 <h1>Mes messages retenus</h1>
-{% if flash %}<div class="banner {{ flash.kind }}" role="status">{{ flash.text }}</div>{% endif %}
 {% if error %}
   <div class="banner error" role="alert">{{ error }}</div>
 {% else %}
@@ -15,30 +15,44 @@
       peuvent pas être gérés ici.</span>
   </div>
   {% endif %}
-  {% if not messages %}
-    <section class="card empty">Aucun message de courrier indésirable en attente.</section>
+  {% if total_all > 3 or f.q or f.periode != 'tout' %}
+  <form method="get" action="{{ url_for('user_messages', token=token) }}" class="filters card">
+    <div class="filter-main">
+      <label class="search">{{ icon('search') }}<input type="search" name="q" value="{{ f.q }}" maxlength="100" placeholder="Expéditeur ou objet" aria-label="Recherche"></label>
+      <select name="periode" aria-label="Période">{% for key, name in periods %}<option value="{{ key }}" {% if key == f.periode %}selected{% endif %}>{{ name }}</option>{% endfor %}</select>
+      <button type="submit" class="primary">{{ icon('filter') }}Filtrer</button>
+      {% if f.q or f.periode != 'tout' %}<a class="btn" href="{{ url_for('user_messages', token=token) }}">{{ icon('x') }}</a>{% endif %}
+    </div>
+  </form>
   {% endif %}
-  {% for m in messages %}
-  <section class="card msg risk-ord">
-    <header>
-      <h2>{{ m.subject or '(sans objet)' }}</h2>
-      <span class="pill risk-ord">Courrier indésirable probable</span>
-    </header>
-    <p class="meta">{{ m.from }} · {{ m.arrived | int | timestamp }}</p>
-    <div class="actions">
-      <form method="post" action="{{ url_for('user_action', token=token, action='release') }}">
-        <input type="hidden" name="queue_id" value="{{ m.id }}">
-        <button type="submit" class="primary">Libérer ce message</button>
-      </form>
-      {% if m.single %}
-      <form method="post" action="{{ url_for('user_action', token=token, action='delete') }}">
-        <input type="hidden" name="queue_id" value="{{ m.id }}">
-        <button type="submit" class="danger">Supprimer</button>
-      </form>
-      {% endif %}
+  {% if not messages %}
+    <section class="card empty">{{ 'Aucun message ne correspond.' if total_all else "Aucun message de courrier indésirable en attente." }}</section>
+  {% else %}
+  <section class="card tablecard">
+    <div class="scroll">
+    <table class="list user-list">
+      <thead><tr><th>Reçu</th><th class="col-from">Expéditeur</th><th>Objet</th><th></th></tr></thead>
+      <tbody>
+      {% for m in messages %}
+      <tr class="risk-ord">
+        <td class="nowrap num">{{ m.arrived | int | shortdate }}</td>
+        <td class="trunc col-from" title="{{ m.from }}">{{ m.from }}</td>
+        <td class="trunc subj"><a href="{{ url_for('user_message', token=token, queue_id=m.id) }}">{{ m.subject or '(sans objet)' }}</a></td>
+        <td class="nowrap"><div class="actions">
+          <a class="btn small-btn icon-btn" title="Voir ce message" aria-label="Voir {{ m.subject }}" href="{{ url_for('user_message', token=token, queue_id=m.id) }}">{{ icon('eye') }}</a>
+          <form method="post" action="{{ url_for('user_action', token=token, action='release') }}" class="inline">
+            <input type="hidden" name="queue_id" value="{{ m.id }}">
+            <button type="submit" class="small-btn primary" title="Libérer ce message">{{ icon('unlock') }}Libérer</button>
+          </form>
+        </div></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
     </div>
   </section>
-  {% endfor %}
+  {{ pagination(pager, url_for('user_messages', token=token, **params(page=pager.page - 1)), url_for('user_messages', token=token, **params(page=pager.page + 1))) }}
+  {% endif %}
   <p class="muted small">Ne libérez que les messages que vous attendiez et dont vous reconnaissez l'expéditeur. Ce lien vous est personnel : ne le transmettez pas.</p>
 {% endif %}
 {% endblock %}
