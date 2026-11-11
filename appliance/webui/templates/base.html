@@ -14,6 +14,8 @@
     <span class="brand">Spambuntu</span>
     <nav>
       <a href="{{ url_for('index') }}" {% if active == 'index' %}class="active"{% endif %}>Tableau de bord</a>
+      <a href="{{ url_for('quarantine_page') }}" {% if active == 'quarantine' %}class="active"{% endif %}>Quarantaine</a>
+      <a href="{{ url_for('mail_page') }}" {% if active == 'mail' %}class="active"{% endif %}>Messagerie</a>
       <a href="{{ url_for('update_page') }}" {% if active == 'update' %}class="active"{% endif %}>Mises à jour</a>
     </nav>
     <span class="spacer"></span>
@@ -25,6 +27,7 @@
   </header>
 {% endif %}
   <main>
+    {% if flash %}<div class="banner {{ flash.kind }}" role="status">{{ flash.text }}</div>{% endif %}
     {% block content %}{% endblock %}
   </main>
   {% block scripts %}{% endblock %}

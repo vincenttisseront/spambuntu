@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Quarantaine · Spambuntu{% endblock %}
+{% block content %}
+<h1>Quarantaine</h1>
+{% if error %}<div class="banner error" role="alert">{{ error }}</div>{% endif %}
+{% if not messages and not error %}
+<section class="card"><p class="muted">Aucun message en quarantaine.</p></section>
+{% endif %}
+{% for m in messages %}
+<section class="card msg">
+  <h2>{{ m.subject or '(sans objet)' }}</h2>
+  <dl class="facts">
+    <dt>De</dt><dd>{{ m.sender }}</dd>
+    <dt>À</dt><dd>{{ m.recipients | join(', ') }}</dd>
+    <dt>Reçu</dt><dd>{{ m.arrived | int | timestamp }}</dd>
+    <dt>Taille</dt><dd>{{ (m.size / 1024) | round(1) }} Ko</dd>
+    <dt>Score</dt><dd>{{ m.score if m.score is not none else '?' }}</dd>
+    {% if m.symbols %}<dt>Règles</dt><dd>{{ m.symbols | join(', ') }}</dd>{% endif %}
+  </dl>
+  <div class="actions">
+    <form method="post" action="{{ url_for('quarantine_action', action='release') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="queue_id" value="{{ m.id }}">
+      <button type="submit" class="primary">Libérer</button>
+    </form>
+    <form method="post" action="{{ url_for('quarantine_action', action='delete') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="queue_id" value="{{ m.id }}">
+      <button type="submit" class="danger">Supprimer</button>
+    </form>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

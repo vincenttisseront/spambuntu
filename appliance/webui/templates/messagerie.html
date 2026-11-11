@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Messagerie · Spambuntu{% endblock %}
+{% block content %}
+<h1>Messagerie</h1>
+
+{% if pending %}<div class="banner warning" role="status">Une configuration est en cours d'application…</div>
+{% elif status %}
+<div class="banner {{ 'success' if status.ok else 'error' }}" role="status">
+  Dernière application ({{ status.at }}) : {{ status.message }}
+</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('mail_save') }}" class="card form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <h2>Domaines protégés</h2>
+  <p class="muted small">Un domaine par ligne, suivi du serveur de messagerie qui doit recevoir le courrier
+    sain : <code>exemple.fr mail.exemple.fr:25</code>. Les domaines absents de cette liste sont refusés
+    (la passerelle n'est pas un relais ouvert).</p>
+  <textarea name="domains" rows="5" spellcheck="false" autocomplete="off">{{ domains_text }}</textarea>
+
+  <h2>Filtrage</h2>
+  <div class="grid">
+    <label>Seuil de marquage<input name="tag" type="number" step="0.5" min="0.5" max="50" value="{{ cfg.thresholds.tag }}"></label>
+    <label>Seuil de quarantaine<input name="quarantine" type="number" step="0.5" min="0.5" max="50" value="{{ cfg.thresholds.quarantine }}"></label>
+    <label>Seuil de rejet<input name="reject" type="number" step="0.5" min="0.5" max="100" value="{{ cfg.thresholds.reject }}"></label>
+  </div>
+  <p class="muted small">Au-delà du seuil de marquage, le message est livré avec l'en-tête <code>X-Spam: Yes</code>
+    (à utiliser dans une règle de tri). Au-delà du seuil de quarantaine, il est retenu ici. Au-delà du seuil de rejet,
+    il est refusé à l'expéditeur.</p>
+  <label class="check"><input type="checkbox" name="quarantine_enabled" {% if cfg.quarantine_enabled %}checked{% endif %}> Activer la quarantaine</label>
+
+  <h2>Avancé</h2>
+  <div class="grid">
+    <label>Nom d'hôte de la passerelle<input name="hostname" value="{{ cfg.hostname }}" placeholder="(nom du système)" autocomplete="off"></label>
+    <label>Taille maximale (Mo)<input name="max_message_mb" type="number" min="1" max="500" value="{{ cfg.max_message_mb }}"></label>
+  </div>
+  <label>Réseaux de confiance (serveurs autorisés à émettre via la passerelle), un par ligne
+    <textarea name="trusted_networks" rows="3" spellcheck="false" autocomplete="off" placeholder="10.0.0.0/24">{{ networks_text }}</textarea></label>
+  <div class="actions"><button type="submit" class="primary">Appliquer</button></div>
+</form>
+{% endblock %}

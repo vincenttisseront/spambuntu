@@ -1,0 +1,9 @@
+[Unit]
+Description=Spambuntu - application de la configuration de la messagerie
+# Démarrée par la console web via sudo (voir sudoers) : la console dépose une demande, ce service la valide
+# à nouveau en root avant de toucher à Postfix et Rspamd.
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/spambuntu-mail apply --from-request
+TimeoutStartSec=3min

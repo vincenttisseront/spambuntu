@@ -2,6 +2,7 @@
 """Transforme iso/user-data en version de test automatisé (ISO « -CITEST », jamais distribuée) :
 compte jetable, aucune question, extinction à la fin, et vérifications écrites sur le port série.
 """
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -22,10 +23,10 @@ checks = [
     "curtin in-target --target=/target -- sh -c 'spambuntu-update status --json 2>&1 | head -c 600; echo; "
     "ls -l /opt/spambuntu/ /etc/spambuntu/ /root/spambuntu-console-password.txt; "
     "systemctl is-enabled spambuntu-webui.service spambuntu-update-check.timer; "
-    "visudo -c; test -s /etc/spambuntu/update-pubkey.pem && echo PUBKEY-OK' > /target/root/citest.log 2>&1",
+    "visudo -c; test -s /etc/spambuntu/update-pubkey.pem && echo PUBKEY-OK; systemctl is-enabled postfix rspamd redis-server; postconf -h mydestination relay_domains smtpd_milters; spambuntu-mail show | head -c 300; rspamadm configtest; dpkg -s postfix rspamd | grep Status' > /target/root/citest.log 2>&1",
     "cat /target/root/citest.log > /dev/ttyS0",
     "echo SPAMBUNTU-CITEST-END > /dev/ttyS0",
 ]
-text = text.rstrip("\n") + "\n" + "".join(f"    - {c!r}\n" if "'" not in c else f"    - \"{c}\"\n" for c in checks)
+text = text.rstrip("\n") + "\n" + "".join(f"    - {json.dumps(c, ensure_ascii=False)}\n" for c in checks)
 text += "  shutdown: poweroff\n"
 path.write_text(text, encoding="utf-8")

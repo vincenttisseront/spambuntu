@@ -15,6 +15,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "appliance" / "updater"))
 sys.path.insert(0, str(ROOT / "appliance" / "webui"))
+sys.path.insert(0, str(ROOT / "appliance" / "mail"))
 
 import spambuntu_update as upd  # noqa: E402
 

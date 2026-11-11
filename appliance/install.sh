@@ -51,6 +51,9 @@ install_packages() {
     [ -z "${SKIP_PACKAGES:-}" ] || return 0
     export DEBIAN_FRONTEND=noninteractive
     mapfile -t packages < <(grep -vE '^\s*(#|$)' "$SRC/packages.txt")
+    if [ -f "$SRC/debconf.preseed" ] && command -v debconf-set-selections >/dev/null 2>&1; then
+        debconf-set-selections "$SRC/debconf.preseed"
+    fi
     if [ -f "$SRC/debs/Packages" ]; then
         # Dépôt apt embarqué (ISO) : installation possible sans accès à internet.
         # Seule cette source est consultée ; les paquets déjà installés ne sont pas rétrogradés.
@@ -81,6 +84,8 @@ setup_dirs() {
     mkd 0755 root:root "$VAR/update"
     mkd 0755 spambuntu:spambuntu "$VAR/update/user"   # seul répertoire inscriptible par la console
     mkd 0700 root:root "$VAR/backups"
+    mkd 0755 root:root "$VAR/mail"
+    mkd 0755 spambuntu:spambuntu "$VAR/mail/user"       # demandes de la console (messagerie)
     mkd 0755 root:root "$LOG"
 }
 
@@ -105,7 +110,15 @@ EOF
 #!/bin/sh
 exec /usr/bin/python3 -I /opt/spambuntu/current/bin/spambuntu-passwd "$@"
 EOF
-    chmod 0755 "$SBIN/spambuntu-update" "$SBIN/spambuntu-passwd"
+    cat > "$SBIN/spambuntu-mail" <<'EOF'
+#!/bin/sh
+exec /usr/bin/python3 -I /opt/spambuntu/current/mail/spambuntu_mail.py "$@"
+EOF
+    cat > "$SBIN/spambuntu-quarantine" <<'EOF'
+#!/bin/sh
+exec /usr/bin/python3 -I /opt/spambuntu/current/mail/spambuntu_quarantine.py "$@"
+EOF
+    chmod 0755 "$SBIN/spambuntu-update" "$SBIN/spambuntu-passwd" "$SBIN/spambuntu-mail" "$SBIN/spambuntu-quarantine"
 }
 
 install_units() {
@@ -176,12 +189,22 @@ install_config() {
     fi
 }
 
+install_mail() {
+    # Configuration initiale de la passerelle : aucun domaine, donc rien n'est relayé tant que
+    # l'administrateur n'en a pas déclaré (jamais de relais ouvert). Sans accès à systemd (ISO, DESTDIR).
+    [ -z "$D" ] || return 0
+    [ -x "$SBIN/spambuntu-mail" ] || return 0
+    "$SBIN/spambuntu-mail" init --no-reload
+}
+
 enable_services() {
     have_systemd || [ -z "$D" ] || return 0
     systemctl enable spambuntu-webui.service spambuntu-update-check.timer || true
+    systemctl enable redis-server.service rspamd.service postfix.service || true
     if [ "$START" -eq 1 ] && have_systemd; then
         systemctl restart spambuntu-webui.service
         systemctl start spambuntu-update-check.timer
+        systemctl restart redis-server.service rspamd.service postfix.service || true
     fi
 }
 
@@ -205,6 +228,7 @@ else
     install_config
     install_pubkey
     install_motd
+    install_mail
     enable_services
     echo "Spambuntu $VERSION installé. Console : https://<adresse-ip>:8443 (certificat auto-signé)"
 fi

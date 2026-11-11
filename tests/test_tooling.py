@@ -116,24 +116,24 @@ def test_release_script(repo_copy, tmp_path):
     run(["git", "commit", "-q", "-m", "init"], cwd=repo_copy, env=GIT_ENV)
     release = [str(repo_copy / "tools" / "release.sh")]
 
-    r = run(release + ["0.2.0"], cwd=repo_copy, env=GIT_ENV, check=False)
+    r = run(release + ["0.3.0"], cwd=repo_copy, env=GIT_ENV, check=False)
     assert r.returncode != 0 and "CHANGELOG" in r.stderr           # notes obligatoires
-    for bad in ("abc", "0.0.9", "0.1.0"):
+    for bad in ("abc", "0.0.9", "0.2.0"):
         assert run(release + [bad], cwd=repo_copy, env=GIT_ENV, check=False).returncode != 0
 
     changelog = repo_copy / "CHANGELOG.md"
-    changelog.write_text(changelog.read_text() + "\n## [0.2.0] - 2026-12-01\n\n- Nouveauté\n")
+    changelog.write_text(changelog.read_text() + "\n## [0.3.0] - 2026-12-01\n\n- Nouveauté\n")
     run(["git", "commit", "-qam", "notes"], cwd=repo_copy, env=GIT_ENV)
-    run(release + ["0.2.0"], cwd=repo_copy, env=GIT_ENV)
-    assert (repo_copy / "VERSION").read_text().strip() == "0.2.0"
-    assert "v0.2.0" in run(["git", "tag"], cwd=repo_copy).stdout
-    assert run(release + ["0.2.0"], cwd=repo_copy, env=GIT_ENV, check=False).returncode != 0  # tag déjà là
+    run(release + ["0.3.0"], cwd=repo_copy, env=GIT_ENV)
+    assert (repo_copy / "VERSION").read_text().strip() == "0.3.0"
+    assert "v0.3.0" in run(["git", "tag"], cwd=repo_copy).stdout
+    assert run(release + ["0.3.0"], cwd=repo_copy, env=GIT_ENV, check=False).returncode != 0  # tag déjà là
 
     (repo_copy / "appliance" / "etc" / "update-pubkey.pem").unlink()
     run(["git", "commit", "-qam", "sans clé"], cwd=repo_copy, env=GIT_ENV)
-    changelog.write_text(changelog.read_text() + "\n## [0.3.0] - 2026-12-02\n\n- Autre\n")
-    run(["git", "commit", "-qam", "notes 0.3"], cwd=repo_copy, env=GIT_ENV)
-    r = run(release + ["0.3.0"], cwd=repo_copy, env=GIT_ENV, check=False)
+    changelog.write_text(changelog.read_text() + "\n## [0.4.0] - 2026-12-02\n\n- Autre\n")
+    run(["git", "commit", "-qam", "notes 0.4"], cwd=repo_copy, env=GIT_ENV)
+    r = run(release + ["0.4.0"], cwd=repo_copy, env=GIT_ENV, check=False)
     assert r.returncode != 0 and "clé publique" in r.stderr
 
 
@@ -169,7 +169,10 @@ def test_fresh_install_into_destdir_then_login(repo_copy, tmp_path):
     assert oct(sudoers.stat().st_mode & 0o777) == "0o440"
     assert "NOPASSWD: SPAMBUNTU_UPDATE" in sudoers.read_text()
     allowed = re.findall(r"/usr/bin/systemctl start --no-block (\S+?)\.service", sudoers.read_text())
-    assert allowed == ["spambuntu-update-apply", "spambuntu-update-rollback"]   # exactement ces deux unités
+    assert allowed == ["spambuntu-update-apply", "spambuntu-update-rollback", "spambuntu-mail-apply"]   # exactement ces unités
+    commands = re.findall(r"^\s+(/\S+)", sudoers.read_text(), re.M)
+    assert set(commands) == {"/usr/bin/systemctl", "/usr/local/sbin/spambuntu-quarantine"}    # rien d'autre
+    assert "spambuntu-quarantine list," in sudoers.read_text().replace("\\\n", "")
     assert "NOPASSWD: ALL" not in sudoers.read_text()
     wrapper = (dest / "usr/local/sbin/spambuntu-update").read_text()
     assert "/opt/spambuntu/current/updater/spambuntu_update.py" in wrapper
@@ -253,6 +256,10 @@ def test_real_bundle_update_end_to_end(env, repo_copy, monkeypatch):
     assert env.current() == "0.2.0"
     assert (dest / "etc/systemd/system/spambuntu-webui.service").is_file()        # post-update.sh -> install.sh --refresh
     assert (dest / "var/lib/spambuntu/migrations.done").exists()
+    assert "0001-messagerie.sh" in (dest / "var/lib/spambuntu/migrations.done").read_text()
+    assert (dest / "var/lib/spambuntu/mail/user").is_dir()                                 # créé par install.sh --refresh
+    assert (dest / "usr/local/sbin/spambuntu-quarantine").is_file()
+    assert (dest / "etc/systemd/system/spambuntu-mail-apply.service").is_file()
     log = env.log.read_text()
     assert "Contrôles préalables réussis" in log and "Rafraîchissement de la version 0.2.0 terminé" in log
     assert not (env.tmp / "var").exists()                                          # rien n'a fuité hors du DESTDIR

@@ -155,3 +155,16 @@ details summary { cursor: pointer; color: var(--muted); margin: .5rem 0; }
   color: var(--text);
 }
 .login button { width: 100%; margin-top: .5rem; }
+
+/* Messagerie et quarantaine */
+textarea, .form input:not([type=checkbox]) {
+  width: 100%; box-sizing: border-box; font: inherit; padding: .5rem .6rem;
+  border: 1px solid var(--border, #c9d1dc); border-radius: 8px; background: transparent; color: inherit;
+}
+textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9rem; resize: vertical; }
+.form label { display: block; margin: .6rem 0; }
+.form .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; }
+.form label.check { display: flex; align-items: center; gap: .5rem; }
+.msg h2 { overflow-wrap: anywhere; }
+.msg .facts dd { overflow-wrap: anywhere; }
+.actions form { margin: 0; }

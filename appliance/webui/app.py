@@ -23,6 +23,9 @@ from werkzeug.security import check_password_hash
 
 RELEASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RELEASE_DIR / "updater"))
+sys.path.insert(0, str(RELEASE_DIR / "mail"))
+import spambuntu_mail as mailcfg  # noqa: E402
+import spambuntu_quarantine as quarantine  # noqa: E402
 import spambuntu_update as upd  # noqa: E402
 
 try:
@@ -35,6 +38,8 @@ LOGIN_WINDOW = 300     # fenêtre de limitation des tentatives de connexion (sec
 LOGIN_MAX_FAILURES = 8
 APPLY_UNIT = "spambuntu-update-apply.service"
 ROLLBACK_UNIT = "spambuntu-update-rollback.service"
+MAIL_UNIT = "spambuntu-mail-apply.service"
+QUARANTINE_BIN = "/usr/local/sbin/spambuntu-quarantine"
 
 
 def start_unit_via_sudo(unit: str):
@@ -45,6 +50,38 @@ def start_unit_via_sudo(unit: str):
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, str(exc)
     return r.returncode == 0, (r.stderr or r.stdout).strip()
+
+
+def run_quarantine_via_sudo(args: list) -> dict:
+    """Appelle le programme root de quarantaine (sudoers n'autorise que ses sous-commandes). Retourne son JSON."""
+    try:
+        r = subprocess.run(["sudo", "-n", QUARANTINE_BIN, *args], capture_output=True, text=True, timeout=60)
+        data = json.loads(r.stdout)
+        return data if isinstance(data, dict) else {"ok": False, "error": "Réponse inattendue"}
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return {"ok": False, "error": "Le service de quarantaine ne répond pas"}
+
+
+def parse_mail_form(form) -> dict:
+    """Transforme le formulaire en configuration brute (la validation stricte est faite par spambuntu_mail)."""
+    domains = []
+    for number, line in enumerate((form.get("domains") or "").splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) != 2:
+            raise mailcfg.MailError(f"Ligne {number} : format attendu « domaine.tld serveur[:port] »")
+        domains.append({"name": parts[0], "relay": parts[1]})
+    networks = [n.strip() for n in (form.get("trusted_networks") or "").replace(",", "\n").splitlines() if n.strip()]
+    return {
+        "hostname": (form.get("hostname") or "").strip(),
+        "domains": domains,
+        "thresholds": {"tag": form.get("tag", ""), "quarantine": form.get("quarantine", ""), "reject": form.get("reject", "")},
+        "quarantine_enabled": form.get("quarantine_enabled") == "on",
+        "max_message_mb": form.get("max_message_mb", ""),
+        "trusted_networks": networks,
+    }
 
 
 def create_app(conf_path: str | None = None, update_conf: str | None = None) -> Flask:
@@ -67,6 +104,9 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
         UPDATE_CONF=update_conf,
         UNIT_STARTER=start_unit_via_sudo,
+        QUARANTINE_RUNNER=run_quarantine_via_sudo,
+        MAIL_CONF=os.environ.get("SPAMBUNTU_MAIL_CONF", "/etc/spambuntu/mail.json"),
+        MAIL_STATE=os.environ.get("SPAMBUNTU_MAIL_STATE", "/var/lib/spambuntu/mail"),
     )
     failures: dict = {}
 
@@ -100,6 +140,10 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         if request.path.startswith("/api/") or request.path in ("/login", "/healthz"):
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    @app.template_filter("timestamp")
+    def timestamp_filter(value):
+        return time.strftime("%d/%m/%Y %H:%M", time.localtime(int(value))) if value else "?"
 
     @app.context_processor
     def template_globals():
@@ -169,6 +213,70 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
     @login_required
     def update_page():
         return render_template("update.html", active="update")
+
+    # ------------------------------------------------------------------ messagerie
+
+    def flash(kind: str, text: str) -> None:
+        session["flash"] = {"kind": kind, "text": text}
+
+    @app.context_processor
+    def flash_global():
+        return {"flash": session.pop("flash", None)}
+
+    def mail_state_dir() -> Path:
+        return Path(app.config["MAIL_STATE"]) / "user"
+
+    @app.get("/messagerie")
+    @login_required
+    def mail_page():
+        try:
+            current = mailcfg.load_config(Path(app.config["MAIL_CONF"]))
+        except mailcfg.MailError:
+            current = mailcfg.validate({})
+        status = upd.read_json(mail_state_dir() / "mail-status.json", None)
+        pending = (mail_state_dir() / "mail-request.json").exists()
+        return render_template("messagerie.html", active="mail", cfg=current, status=status, pending=pending,
+                               domains_text="\n".join(f"{d['name']} {d['relay']}" for d in current["domains"]),
+                               networks_text="\n".join(current["trusted_networks"]))
+
+    @app.post("/messagerie")
+    @login_required
+    def mail_save():
+        try:
+            new = mailcfg.validate(parse_mail_form(request.form))
+        except mailcfg.MailError as exc:
+            flash("error", f"Configuration refusée : {exc}")
+            return redirect(url_for("mail_page"))
+        request_file = mail_state_dir() / "mail-request.json"
+        upd.write_json_atomic(request_file, new)
+        ok, message = app.config["UNIT_STARTER"](MAIL_UNIT)
+        if not ok:
+            request_file.unlink(missing_ok=True)
+            flash("error", f"Impossible d'appliquer la configuration : {message}")
+        else:
+            flash("success", "Configuration envoyée : application en cours…")
+        return redirect(url_for("mail_page"))
+
+    @app.get("/quarantaine")
+    @login_required
+    def quarantine_page():
+        result = app.config["QUARANTINE_RUNNER"](["list"])
+        if not result.get("ok"):
+            return render_template("quarantaine.html", active="quarantine", messages=[], error=result.get("error"))
+        return render_template("quarantaine.html", active="quarantine", messages=result.get("messages", []), error=None)
+
+    @app.post("/quarantaine/<action>")
+    @login_required
+    def quarantine_action(action):
+        if action not in ("release", "delete"):
+            abort(404)
+        queue_id = request.form.get("queue_id", "")
+        if not quarantine.QUEUE_ID_RE.fullmatch(queue_id):
+            flash("error", "Identifiant de message invalide")
+            return redirect(url_for("quarantine_page"))
+        result = app.config["QUARANTINE_RUNNER"]([action, queue_id, "--actor", session.get("user", "console")])
+        flash("success" if result.get("ok") else "error", result.get("message") or result.get("error") or "Échec")
+        return redirect(url_for("quarantine_page"))
 
     # ------------------------------------------------------------------ API des mises à jour
 

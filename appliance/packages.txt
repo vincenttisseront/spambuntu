@@ -6,3 +6,7 @@ gunicorn
 openssl
 sudo
 ca-certificates
+# Passerelle de messagerie (0.2.0)
+postfix
+rspamd
+redis-server
