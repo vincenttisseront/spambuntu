@@ -2,6 +2,7 @@ import json
 import os
 import re
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -206,3 +207,16 @@ def test_update_page_and_dashboard_render(auth):
     assert "Mises à jour" in page and "update.js" in page
     home = auth.client.get("/").get_data(as_text=True)
     assert "0.2.0" in home and "est disponible" in home
+
+
+def test_console_imports_in_a_clean_release_layout(tmp_path):
+    """La console doit démarrer avec le seul sys.path de app.py (sans l'aide de conftest) : régression 0.3.0."""
+    import shutil
+    import subprocess
+    import sys
+    rel = tmp_path / "rel"
+    shutil.copytree(Path(__file__).resolve().parent.parent / "appliance", rel,
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    out = subprocess.run([sys.executable, "-I", "-c", "import sys; sys.path.insert(0, 'webui'); import app"],
+                         cwd=rel, capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr

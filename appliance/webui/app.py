@@ -25,6 +25,7 @@ from werkzeug.security import check_password_hash
 RELEASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RELEASE_DIR / "updater"))
 sys.path.insert(0, str(RELEASE_DIR / "mail"))
+sys.path.insert(0, str(RELEASE_DIR / "ai"))
 import spambuntu_ai as aicfg  # noqa: E402
 import spambuntu_digest as digest  # noqa: E402
 import spambuntu_mail as mailcfg  # noqa: E402
