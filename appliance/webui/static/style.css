@@ -483,3 +483,10 @@ table.list .folder-line { max-width: 7.5rem; overflow: hidden; text-overflow: el
 .classbar progress.hot::-webkit-progress-value { background: #dc2626; }
 .classbar progress.hot::-moz-progress-bar { background: #dc2626; }
 @media (max-width: 760px) { table.list .col-sym { display: none; } .classbar { grid-template-columns: 8rem 1fr 2rem; } }
+@media (max-width: 760px) {
+  table.rules-table th:nth-child(3), table.rules-table td.cond, table.rules-table th.r, table.rules-table td.r, table.rules-table ul.bullets { display: none; }
+  table.rules-table td.what { min-width: 0; max-width: 14rem; }
+  table.rules-table .rule-id { overflow-wrap: normal; word-break: normal; }
+  table.rules-table td.actionlist { min-width: 0; }
+  table.rules-table td.sw, table.rules-table th.sw { width: 3rem; }
+}
