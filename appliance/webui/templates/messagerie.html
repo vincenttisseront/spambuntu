@@ -29,6 +29,11 @@
     il est refusé à l'expéditeur.</p>
   <label class="check"><input type="checkbox" name="quarantine_enabled" {% if cfg.quarantine_enabled %}checked{% endif %}> Activer la quarantaine</label>
 
+  <label class="check"><input type="checkbox" name="verify_recipients" {% if cfg.verify_recipients %}checked{% endif %}> Vérifier les destinataires auprès du serveur de destination</label>
+  <p class="muted small">Un message pour une adresse inexistante est refusé immédiatement, au lieu d'être accepté puis
+    rejeté plus tard vers un expéditeur souvent usurpé. Désactivez-le si votre serveur accepte tout destinataire
+    sur le moment (il ne doit pas répondre « 250 » à une adresse inconnue).</p>
+
   <h2>Avancé</h2>
   <div class="grid">
     <label>Nom d'hôte de la passerelle<input name="hostname" value="{{ cfg.hostname }}" placeholder="(nom du système)" autocomplete="off"></label>

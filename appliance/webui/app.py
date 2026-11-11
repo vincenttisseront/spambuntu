@@ -79,6 +79,7 @@ def parse_mail_form(form) -> dict:
         "domains": domains,
         "thresholds": {"tag": form.get("tag", ""), "quarantine": form.get("quarantine", ""), "reject": form.get("reject", "")},
         "quarantine_enabled": form.get("quarantine_enabled") == "on",
+        "verify_recipients": form.get("verify_recipients") == "on",
         "max_message_mb": form.get("max_message_mb", ""),
         "trusted_networks": networks,
     }

@@ -12,6 +12,9 @@ console web de l'appliance au moment de proposer la mise à jour.
 - Trois niveaux d'action réglables : marquage (en-tête `X-Spam: Yes`), quarantaine, rejet.
 - Page « Quarantaine » dans la console : lire, libérer ou supprimer les messages retenus
   (chaque action est journalisée dans `/var/log/spambuntu/quarantine.log`).
+- Vérification des destinataires auprès du serveur de destination (option) : une adresse inexistante est
+  refusée tout de suite, sans rejet renvoyé à un expéditeur usurpé.
+- TLS entrant (STARTTLS, TLS 1.2 minimum) avec un certificat auto-signé généré à l'installation.
 - Page « Messagerie » dans la console : domaines, serveurs de destination, seuils, réseaux de confiance.
 
 ### Mise à jour depuis 0.1.x

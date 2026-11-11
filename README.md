@@ -108,8 +108,8 @@ Choix de conception :
   journalisée dans `/var/log/spambuntu/quarantine.log`.
 - Le greylisting de Rspamd est désactivé (il retarde le premier message de tout nouvel expéditeur).
 
-Pas encore couvert : TLS entrant, vérification des destinataires auprès de votre serveur (un destinataire
-inexistant est accepté puis refusé en aval), signature DKIM sortante, résumé quotidien de quarantaine.
+Pas encore couvert : certificat TLS de confiance pour la passerelle (le certificat auto-signé suffit pour
+STARTTLS entre serveurs), signature DKIM sortante, résumé quotidien de quarantaine.
 
 ## Publier une version
 

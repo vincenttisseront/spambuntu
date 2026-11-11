@@ -382,3 +382,43 @@ def test_quarantine_page_survives_a_broken_backend(mailweb):
     mailweb.app.config["QUARANTINE_RUNNER"] = lambda args: {"ok": False, "error": "Le service de quarantaine ne répond pas"}
     html = mailweb.client.get("/quarantaine").get_data(as_text=True)
     assert "ne répond pas" in html
+
+
+# ------------------------------------------------------------------ vérification des destinataires et TLS
+
+def test_recipient_verification_is_on_by_default_and_optional():
+    on = mail.render(mail.validate({}))["postconf"]["smtpd_recipient_restrictions"]
+    off = mail.render(mail.validate({"verify_recipients": False}))["postconf"]["smtpd_recipient_restrictions"]
+    assert on.endswith("reject_unverified_recipient") and "reject_unverified_recipient" not in off
+    assert on.index("reject_unauth_destination") < on.index("reject_unverified_recipient")     # jamais avant le contrôle de relais
+    with pytest.raises(mail.MailError):
+        mail.validate({"verify_recipients": "oui"})
+
+
+def test_inbound_tls_only_when_a_certificate_exists(tmp_path):
+    cfg = mail.validate(GOOD)
+    assert mail.render(cfg)["postconf"]["smtpd_tls_security_level"] == "none"
+    run = FakeRun()
+    mail.Applier(root=tmp_path, run=run).apply(cfg)
+    assert "smtpd_tls_security_level=none" in " ".join(next(c for c in run.calls if c[:2] == ["postconf", "-e"]))
+    tls = tmp_path / "etc/spambuntu/tls"
+    tls.mkdir(parents=True)
+    (tls / "smtp.crt").write_text("x")
+    (tls / "smtp.key").write_text("x")
+    run = FakeRun()
+    mail.Applier(root=tmp_path, run=run).apply(cfg)
+    settings = " ".join(next(c for c in run.calls if c[:2] == ["postconf", "-e"]))
+    assert "smtpd_tls_security_level=may" in settings and "smtpd_tls_cert_file=/etc/spambuntu/tls/smtp.crt" in settings
+    assert "!TLSv1" in mail.render(cfg, tls=True)["postconf"]["smtpd_tls_protocols"]
+
+
+def test_tls_certificate_generation_is_private_and_never_overwritten(tmp_path):
+    tls = tmp_path / "tls"
+    assert mail.ensure_tls_certificate(tls, "mx.exemple.fr") is True
+    assert oct((tls / "smtp.key").stat().st_mode & 0o777) == "0o600"
+    first = (tls / "smtp.crt").read_bytes()
+    assert mail.ensure_tls_certificate(tls, "autre.fr") is True and (tls / "smtp.crt").read_bytes() == first
+    out = subprocess.run(["openssl", "x509", "-in", str(tls / "smtp.crt"), "-noout", "-subject"],
+                         capture_output=True, text=True).stdout
+    assert "mx.exemple.fr" in out
+    assert mail.ensure_tls_certificate(tmp_path / "t2", "bad host;x") is True          # nom invalide : repli sur « spambuntu »

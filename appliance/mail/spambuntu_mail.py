@@ -37,6 +37,7 @@ DEFAULTS = {
     "domains": [],
     "thresholds": {"tag": 5.0, "quarantine": 8.0, "reject": 15.0},
     "quarantine_enabled": True,
+    "verify_recipients": True,
     "max_message_mb": 50,
     "trusted_networks": [],
 }
@@ -129,6 +130,8 @@ def validate(raw) -> dict:
 
     if not isinstance(cfg["quarantine_enabled"], bool):
         raise MailError("Option de quarantaine invalide")
+    if not isinstance(cfg["verify_recipients"], bool):
+        raise MailError("Option de vérification des destinataires invalide")
     cfg["max_message_mb"] = int(_number(cfg["max_message_mb"], "Taille maximale des messages (Mo)", 1, 500))
 
     networks = cfg["trusted_networks"]
@@ -149,7 +152,10 @@ def validate(raw) -> dict:
 
 # --------------------------------------------------------------------------- rendu
 
-def render(cfg: dict, system_hostname: str = "localhost.localdomain") -> dict:
+TLS_DIR = Path("/etc/spambuntu/tls")
+
+
+def render(cfg: dict, system_hostname: str = "localhost.localdomain", tls: bool = False) -> dict:
     """Retourne {"files": {nom: contenu}, "postconf": {clé: valeur}} pour une configuration VALIDÉE."""
     th = cfg["thresholds"]
     files = {
@@ -197,7 +203,12 @@ def render(cfg: dict, system_hostname: str = "localhost.localdomain") -> dict:
         "local_recipient_maps": "",
         "smtpd_helo_required": "yes",
         "smtpd_relay_restrictions": "permit_mynetworks, reject_unauth_destination",
-        "smtpd_recipient_restrictions": "permit_mynetworks, reject_non_fqdn_recipient, reject_unauth_destination",
+        # Avec la vérification, Postfix demande au serveur de destination si le destinataire existe avant d'accepter
+        # le message : un destinataire inconnu est refusé tout de suite (pas de rejet renvoyé à un faux expéditeur).
+        "smtpd_recipient_restrictions": "permit_mynetworks, reject_non_fqdn_recipient, reject_unauth_destination"
+        + (", reject_unverified_recipient" if cfg["verify_recipients"] else ""),
+        "unverified_recipient_reject_code": "550",
+        "address_verify_negative_cache": "yes",
         "smtpd_milters": "inet:127.0.0.1:11332",
         "non_smtpd_milters": "$smtpd_milters",
         "milter_default_action": "tempfail",
@@ -206,7 +217,11 @@ def render(cfg: dict, system_hostname: str = "localhost.localdomain") -> dict:
         "header_checks": "",
         "message_size_limit": str(size),
         "smtp_tls_security_level": "may",
-        "smtpd_tls_security_level": "none",
+        "smtpd_tls_security_level": "may" if tls else "none",
+        "smtpd_tls_cert_file": f"{TLS_DIR}/smtp.crt" if tls else "",
+        "smtpd_tls_key_file": f"{TLS_DIR}/smtp.key" if tls else "",
+        "smtpd_tls_protocols": "!SSLv2, !SSLv3, !TLSv1, !TLSv1.1",
+        "smtpd_tls_loglevel": "1",
         "disable_vrfy_command": "yes",
         "smtpd_banner": "$myhostname ESMTP",
     }
@@ -283,7 +298,8 @@ class Applier:
     def apply(self, cfg: dict) -> None:
         system_hostname = (Path(self.p(Path("/etc/hostname"))).read_text().strip()
                            if self.p(Path("/etc/hostname")).is_file() else "localhost.localdomain") or "localhost.localdomain"
-        plan = render(cfg, system_hostname)
+        tls = self.p(TLS_DIR / "smtp.crt").is_file() and self.p(TLS_DIR / "smtp.key").is_file()
+        plan = render(cfg, system_hostname, tls)
         targets = {
             "relay_domains": self.p(POSTFIX_DIR / "relay_domains"),
             "transport": self.p(POSTFIX_DIR / "transport"),
@@ -328,6 +344,25 @@ class Applier:
                     write_atomic(path, before[name])
         if old_conf:
             self.run(["postconf", "-e", *[f"{k}={v}" for k, v in old_conf.items()]])
+
+
+def ensure_tls_certificate(tls_dir: Path = TLS_DIR, hostname: str = "", run=_run) -> bool:
+    """Certificat auto-signé pour le TLS entrant de Postfix (jamais écrasé). Retourne True s'il en existe un."""
+    crt, key = tls_dir / "smtp.crt", tls_dir / "smtp.key"
+    if crt.is_file() and key.is_file():
+        return True
+    host = hostname or (Path("/etc/hostname").read_text().strip() if Path("/etc/hostname").is_file() else "") or "spambuntu"
+    if not HOSTNAME_RE.fullmatch(host):
+        host = "spambuntu"
+    tls_dir.mkdir(parents=True, exist_ok=True)
+    res = run(["openssl", "req", "-x509", "-nodes", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+               "-days", "3650", "-subj", f"/CN={host}", "-addext", f"subjectAltName=DNS:{host}",
+               "-keyout", str(key), "-out", str(crt)])
+    if res.returncode != 0:
+        return False
+    os.chmod(key, 0o600)        # lu par le processus maître de Postfix (root) uniquement
+    os.chmod(crt, 0o644)
+    return True
 
 
 def write_status(state_dir: Path, ok: bool, message: str) -> None:
@@ -380,6 +415,7 @@ def main(argv=None) -> int:
                 import grp
                 os.chown(CONF_PATH, -1, grp.getgrnam("spambuntu").gr_gid)
         STATE_DIR.joinpath("user").mkdir(parents=True, exist_ok=True)
+        ensure_tls_certificate()
         return cmd_apply(argparse.Namespace(from_request=False), applier=Applier(reload=not args.no_reload))
     return cmd_apply(args)
 
