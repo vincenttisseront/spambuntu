@@ -2,7 +2,8 @@
 # La console web (utilisateur « spambuntu ») ne peut lancer QUE :
 #   - trois unités systemd, sans aucun argument libre (mise à jour, retour arrière, application de la
 #     configuration de messagerie) : le travail privilégié est fait par l'unité, pas par la console ;
-#   - les trois sous-commandes du programme de quarantaine, qui valide lui-même ses arguments.
+#   - les sous-commandes du programme de quarantaine et des statistiques de messagerie, qui valident
+#     eux-mêmes leurs arguments (lecture seule pour les statistiques).
 Cmnd_Alias SPAMBUNTU_UPDATE = \
     /usr/bin/systemctl start --no-block spambuntu-update-apply.service, \
     /usr/bin/systemctl start --no-block spambuntu-update-rollback.service
@@ -10,5 +11,7 @@ Cmnd_Alias SPAMBUNTU_MAIL = \
     /usr/bin/systemctl start --no-block spambuntu-mail-apply.service, \
     /usr/local/sbin/spambuntu-quarantine list, \
     /usr/local/sbin/spambuntu-quarantine release * --actor *, \
-    /usr/local/sbin/spambuntu-quarantine delete * --actor *
+    /usr/local/sbin/spambuntu-quarantine delete * --actor *, \
+    /usr/local/sbin/spambuntu-mailstats summary --hours *, \
+    /usr/local/sbin/spambuntu-mailstats search *
 spambuntu ALL=(root) NOPASSWD: SPAMBUNTU_UPDATE, SPAMBUNTU_MAIL

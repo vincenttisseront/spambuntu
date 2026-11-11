@@ -168,3 +168,24 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9r
 .msg h2 { overflow-wrap: anywhere; }
 .msg .facts dd { overflow-wrap: anywhere; }
 .actions form { margin: 0; }
+
+/* Tableau de bord et journal */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: .6rem .8rem; }
+.tile strong { display: block; font-size: 1.5rem; }
+.tile span { color: var(--muted); font-size: .85rem; }
+.chart { width: 100%; height: auto; margin: .5rem 0 1rem; }
+.bar.cat-delivered { fill: #7aa7e8; }
+.bar.cat-tagged { fill: #e0b341; }
+.bar.cat-deferred { fill: #9aa5b5; }
+.bar.cat-quarantined { fill: #e08a3c; }
+.bar.cat-rejected { fill: #c0392b; }
+.tops { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+.tops p { margin: .2rem 0; overflow-wrap: anywhere; }
+.scroll { overflow-x: auto; }
+table.journal { width: 100%; border-collapse: collapse; font-size: .88rem; }
+table.journal th, table.journal td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.pill { padding: .1rem .5rem; border-radius: 999px; font-size: .8rem; border: 1px solid var(--line); }
+.pill.cat-quarantined { border-color: #e08a3c; }
+.pill.cat-rejected { border-color: #c0392b; }
+select { font: inherit; padding: .45rem; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: inherit; width: 100%; }

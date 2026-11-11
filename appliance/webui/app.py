@@ -10,6 +10,7 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -40,6 +41,10 @@ APPLY_UNIT = "spambuntu-update-apply.service"
 ROLLBACK_UNIT = "spambuntu-update-rollback.service"
 MAIL_UNIT = "spambuntu-mail-apply.service"
 QUARANTINE_BIN = "/usr/local/sbin/spambuntu-quarantine"
+STATS_BIN = "/usr/local/sbin/spambuntu-mailstats"
+STATS_WINDOWS = {"24": 24, "72": 72, "168": 168}
+JOURNAL_CATEGORIES = ("delivered", "tagged", "quarantined", "rejected", "deferred")
+JOURNAL_QUERY_RE = re.compile(r"[\w@.+\-:\[\] ]{1,100}")
 
 
 def start_unit_via_sudo(unit: str):
@@ -50,6 +55,36 @@ def start_unit_via_sudo(unit: str):
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, str(exc)
     return r.returncode == 0, (r.stderr or r.stdout).strip()
+
+
+def run_stats_via_sudo(args: list) -> dict:
+    """Appelle le programme root de statistiques (lecture seule du journal de Rspamd). Retourne son JSON."""
+    try:
+        r = subprocess.run(["sudo", "-n", STATS_BIN, *args], capture_output=True, text=True, timeout=60)
+        data = json.loads(r.stdout)
+        return data if isinstance(data, dict) else {"ok": False, "error": "Réponse inattendue"}
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return {"ok": False, "error": "Le service de statistiques ne répond pas"}
+
+
+def chart_bars(summary: dict, width: int = 720, height: int = 140) -> list:
+    """Géométrie d'un histogramme empilé (SVG généré côté serveur : la CSP interdit les styles en ligne)."""
+    buckets = summary.get("timeline") or []
+    if not buckets:
+        return []
+    peak = max(sum(b.get(c, 0) for c in ("delivered", "tagged", "quarantined", "rejected", "deferred")) for b in buckets) or 1
+    slot = width / len(buckets)
+    bars = []
+    for i, b in enumerate(buckets):
+        y = height
+        for cat in ("delivered", "tagged", "deferred", "quarantined", "rejected"):
+            h = round(b.get(cat, 0) / peak * (height - 4), 2)
+            if h <= 0:
+                continue
+            y = round(y - h, 2)
+            bars.append({"x": round(i * slot + 1, 2), "y": y, "w": round(max(slot - 2, 1), 2), "h": h, "cat": cat,
+                         "tip": f"{time.strftime('%d/%m %H:%M', time.localtime(b['start']))} · {cat} : {b.get(cat, 0)}"})
+    return bars
 
 
 def run_quarantine_via_sudo(args: list) -> dict:
@@ -106,6 +141,7 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         UPDATE_CONF=update_conf,
         UNIT_STARTER=start_unit_via_sudo,
         QUARANTINE_RUNNER=run_quarantine_via_sudo,
+        STATS_RUNNER=run_stats_via_sudo,
         MAIL_CONF=os.environ.get("SPAMBUNTU_MAIL_CONF", "/etc/spambuntu/mail.json"),
         MAIL_STATE=os.environ.get("SPAMBUNTU_MAIL_STATE", "/var/lib/spambuntu/mail"),
     )
@@ -208,7 +244,33 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
     @app.get("/")
     @login_required
     def index():
-        return render_template("index.html", active="index", check=upd.read_check(cfg()))
+        stats = app.config["STATS_RUNNER"](["summary", "--hours", "24"])
+        return render_template("index.html", active="index", check=upd.read_check(cfg()),
+                               stats=stats if stats.get("ok") else None, bars=chart_bars(stats) if stats.get("ok") else [])
+
+    @app.get("/journal")
+    @login_required
+    def journal_page():
+        query = (request.args.get("q") or "").strip()
+        category = request.args.get("action", "")
+        hours = request.args.get("hours", "24")
+        error = None
+        if hours not in STATS_WINDOWS:
+            hours = "24"
+        if category and category not in JOURNAL_CATEGORIES:
+            category = ""
+        if query and not JOURNAL_QUERY_RE.fullmatch(query):
+            error, query = "Recherche invalide : lettres, chiffres et @ . + - : uniquement.", ""
+        args = ["search", "--hours", hours, "--limit", "200"]
+        if query:
+            args += ["--q", query]
+        if category:
+            args += ["--action", category]
+        result = app.config["STATS_RUNNER"](args)
+        if not result.get("ok"):
+            error = error or result.get("error")
+        return render_template("journal.html", active="journal", records=result.get("records", []), error=error,
+                               q=query, category=category, hours=hours, categories=JOURNAL_CATEGORIES)
 
     @app.get("/system/update")
     @login_required

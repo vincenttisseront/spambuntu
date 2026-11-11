@@ -171,7 +171,7 @@ def test_fresh_install_into_destdir_then_login(repo_copy, tmp_path):
     allowed = re.findall(r"/usr/bin/systemctl start --no-block (\S+?)\.service", sudoers.read_text())
     assert allowed == ["spambuntu-update-apply", "spambuntu-update-rollback", "spambuntu-mail-apply"]   # exactement ces unités
     commands = re.findall(r"^\s+(/\S+)", sudoers.read_text(), re.M)
-    assert set(commands) == {"/usr/bin/systemctl", "/usr/local/sbin/spambuntu-quarantine"}    # rien d'autre
+    assert set(commands) == {"/usr/bin/systemctl", "/usr/local/sbin/spambuntu-quarantine", "/usr/local/sbin/spambuntu-mailstats"}    # rien d'autre
     assert "spambuntu-quarantine list," in sudoers.read_text().replace("\\\n", "")
     assert "NOPASSWD: ALL" not in sudoers.read_text()
     wrapper = (dest / "usr/local/sbin/spambuntu-update").read_text()

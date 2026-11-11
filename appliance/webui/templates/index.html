@@ -1,5 +1,32 @@
 {% extends "base.html" %}
-{% block title %}Tableau de bord · Spambuntu{% endblock %}
+{% block title %}Tableau de bord · Spambuntu
+<section class="card">
+  <h2>Courrier des dernières 24 h</h2>
+  {% if not stats %}
+    <p class="muted">Statistiques indisponibles pour le moment.</p>
+  {% elif not stats.total %}
+    <p class="muted">Aucun message analysé sur la période.</p>
+  {% else %}
+    <div class="tiles">
+      <div class="tile"><strong>{{ stats.total }}</strong><span>analysés</span></div>
+      <div class="tile cat-delivered"><strong>{{ stats.counts.delivered }}</strong><span>livrés</span></div>
+      <div class="tile cat-tagged"><strong>{{ stats.counts.tagged }}</strong><span>marqués</span></div>
+      <div class="tile cat-quarantined"><strong>{{ stats.counts.quarantined }}</strong><span>en quarantaine</span></div>
+      <div class="tile cat-rejected"><strong>{{ stats.counts.rejected }}</strong><span>rejetés</span></div>
+    </div>
+    <svg class="chart" viewBox="0 0 720 140" role="img" aria-label="Messages par heure">
+      {% for b in bars %}<rect class="bar cat-{{ b.cat }}" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}"><title>{{ b.tip }}</title></rect>{% endfor %}
+    </svg>
+    <div class="tops">
+      <div><h3>Domaines expéditeurs</h3>
+        {% for t in stats.top_sender_domains %}<p><a href="{{ url_for('journal_page', q=t.name) }}">{{ t.name }}</a> <span class="muted">{{ t.count }}</span></p>{% else %}<p class="muted">—</p>{% endfor %}</div>
+      <div><h3>Règles déclenchées</h3>
+        {% for t in stats.top_symbols %}<p>{{ t.name }} <span class="muted">{{ t.count }}</span></p>{% else %}<p class="muted">—</p>{% endfor %}</div>
+    </div>
+    <p><a href="{{ url_for('journal_page') }}">Rechercher dans le journal</a></p>
+  {% endif %}
+</section>
+{% endblock %}
 {% block content %}
 <h1>Tableau de bord</h1>
 

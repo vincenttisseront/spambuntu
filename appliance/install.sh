@@ -118,7 +118,11 @@ EOF
 #!/bin/sh
 exec /usr/bin/python3 -I /opt/spambuntu/current/mail/spambuntu_quarantine.py "$@"
 EOF
-    chmod 0755 "$SBIN/spambuntu-update" "$SBIN/spambuntu-passwd" "$SBIN/spambuntu-mail" "$SBIN/spambuntu-quarantine"
+    cat > "$SBIN/spambuntu-mailstats" <<'EOF'
+#!/bin/sh
+exec /usr/bin/python3 -I /opt/spambuntu/current/mail/spambuntu_logs.py "$@"
+EOF
+    chmod 0755 "$SBIN/spambuntu-update" "$SBIN/spambuntu-passwd" "$SBIN/spambuntu-mail" "$SBIN/spambuntu-quarantine" "$SBIN/spambuntu-mailstats"
 }
 
 install_units() {

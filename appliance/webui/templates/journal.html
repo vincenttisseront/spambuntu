@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Journal · Spambuntu{% endblock %}
+{% block content %}
+<h1>Journal des messages</h1>
+<section class="card">
+  <form method="get" action="{{ url_for('journal_page') }}" class="form">
+    <div class="grid">
+      <label>Expéditeur, destinataire, IP ou identifiant
+        <input type="text" name="q" value="{{ q }}" maxlength="100"></label>
+      <label>Résultat
+        <select name="action"><option value="">Tous</option>
+          {% for c in categories %}<option value="{{ c }}" {% if c == category %}selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select></label>
+      <label>Période
+        <select name="hours">
+          {% for h, name in (('24', '24 heures'), ('72', '3 jours'), ('168', '7 jours')) %}<option value="{{ h }}" {% if h == hours %}selected{% endif %}>{{ name }}</option>{% endfor %}
+        </select></label>
+    </div>
+    <button type="submit" class="primary">Rechercher</button>
+  </form>
+  <p class="muted">Métadonnées uniquement (ni objet ni contenu). Historique limité par la rotation des journaux (environ 5 jours).</p>
+</section>
+{% if error %}<div class="banner error" role="alert">{{ error }}</div>{% endif %}
+{% if not records and not error %}<section class="card"><p class="muted">Aucun message.</p></section>{% endif %}
+{% if records %}
+<section class="card scroll">
+  <table class="journal">
+    <thead><tr><th>Date</th><th>Résultat</th><th>Score</th><th>De</th><th>À</th><th>IP</th><th>Règles</th></tr></thead>
+    <tbody>
+    {% for r in records %}
+      <tr><td>{{ r.ts | timestamp }}</td>
+        <td><span class="pill cat-{{ r.category }}">{{ r.category }}</span></td>
+        <td>{{ r.score }}</td><td>{{ r.sender or '(vide)' }}</td><td>{{ r.rcpts | join(', ') }}</td>
+        <td>{{ r.ip }}</td><td>{{ r.symbols | join(', ') }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

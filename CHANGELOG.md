@@ -3,6 +3,11 @@
 Le contenu de la section d'une version est publié comme notes de release et affiché dans la
 console web de l'appliance au moment de proposer la mise à jour.
 
+## Non publié
+
+- Tableau de bord : compteurs et histogramme des dernières 24 h, domaines et règles les plus fréquents.
+- Page « Journal » : recherche de messages (expéditeur, destinataire, IP, identifiant) dans le journal de Rspamd, métadonnées uniquement.
+
 ## [0.2.0] - 2026-11-11
 
 ### Ajouté
