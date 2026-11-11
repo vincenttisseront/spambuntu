@@ -128,11 +128,15 @@ EOF
 #!/bin/sh
 exec /usr/bin/python3 -I /opt/spambuntu/current/mail/spambuntu_logs.py "$@"
 EOF
+    cat > "$SBIN/spambuntu-digest" <<'EOF'
+#!/bin/sh
+exec /usr/bin/python3 -I /opt/spambuntu/current/mail/spambuntu_digest.py "$@"
+EOF
     cat > "$SBIN/spambuntu-ai" <<'EOF'
 #!/bin/sh
 exec /usr/bin/python3 -I /opt/spambuntu/current/ai/spambuntu_ai.py "$@"
 EOF
-    chmod 0755 "$SBIN/spambuntu-update" "$SBIN/spambuntu-passwd" "$SBIN/spambuntu-mail" "$SBIN/spambuntu-quarantine" "$SBIN/spambuntu-mailstats" "$SBIN/spambuntu-ai"
+    chmod 0755 "$SBIN/spambuntu-update" "$SBIN/spambuntu-passwd" "$SBIN/spambuntu-mail" "$SBIN/spambuntu-quarantine" "$SBIN/spambuntu-mailstats" "$SBIN/spambuntu-ai" "$SBIN/spambuntu-digest"
 }
 
 install_units() {
@@ -222,11 +226,11 @@ install_ai() {
 
 enable_services() {
     have_systemd || [ -z "$D" ] || return 0
-    systemctl enable spambuntu-webui.service spambuntu-update-check.timer || true
+    systemctl enable spambuntu-webui.service spambuntu-update-check.timer spambuntu-digest.timer || true
     systemctl enable redis-server.service rspamd.service postfix.service spambuntu-ai.service || true
     if [ "$START" -eq 1 ] && have_systemd; then
         systemctl restart spambuntu-webui.service
-        systemctl start spambuntu-update-check.timer
+        systemctl start spambuntu-update-check.timer spambuntu-digest.timer
         systemctl restart spambuntu-ai.service redis-server.service rspamd.service postfix.service || true
     fi
 }

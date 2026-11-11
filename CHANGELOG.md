@@ -14,6 +14,11 @@ console web de l'appliance au moment de proposer la mise à jour.
   disjoncteur, journal d'audit des envois, cascade petit/gros modèle.
 - Page « IA » de la console : mode, serveur, jeton (écriture seule), autorité de certification privée, modèles,
   limites ; la configuration est appliquée par un service root qui teste la connexion.
+- Quarantaine : l'explication de l'analyse IA est affichée ; « Légitime : libérer » et « Spam : supprimer »
+  entraînent le filtre bayésien et alimentent un corpus de retours (métadonnées seulement).
+- Résumé quotidien de quarantaine (désactivé par défaut) : un courrier par destinataire des domaines déclarés,
+  avec, si l'adresse de la console est renseignée, des liens de libération personnels signés (3 jours, confirmation
+  obligatoire, limités aux messages peu suspects).
 
 ## [0.2.0] - 2026-11-11
 

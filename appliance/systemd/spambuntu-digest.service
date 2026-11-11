@@ -1,0 +1,7 @@
+[Unit]
+Description=Spambuntu - résumé quotidien de quarantaine
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/spambuntu-digest run
+TimeoutStartSec=10min

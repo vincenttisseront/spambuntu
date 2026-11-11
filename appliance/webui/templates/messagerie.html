@@ -41,6 +41,19 @@
   </div>
   <label>Réseaux de confiance (serveurs autorisés à émettre via la passerelle), un par ligne
     <textarea name="trusted_networks" rows="3" spellcheck="false" autocomplete="off" placeholder="10.0.0.0/24">{{ networks_text }}</textarea></label>
+
+  <h2>Résumé quotidien de quarantaine</h2>
+  <label class="check"><input type="checkbox" name="digest_enabled" {% if cfg.digest_enabled %}checked{% endif %}> Envoyer chaque matin un résumé aux destinataires dont des messages sont en quarantaine</label>
+  <div class="grid">
+    <label>Expéditeur du résumé<input name="digest_from" type="email" value="{{ cfg.digest_from }}" placeholder="quarantaine@nom-de-la-passerelle" autocomplete="off"></label>
+    <label>Adresse de la console (liens de libération)<input name="digest_base_url" value="{{ cfg.digest_base_url }}" placeholder="https://passerelle.exemple.fr:8443" autocomplete="off"></label>
+    <label>Score maximal libérable<input name="digest_release_max_score" type="number" step="0.5" min="0" max="100" value="{{ cfg.digest_release_max_score }}"></label>
+  </div>
+  <p class="muted small">Chaque destinataire reçoit la liste de ses propres messages retenus. Si une adresse de console est indiquée,
+    chaque message porte un lien de libération personnel (valable 3 jours, à usage unique, avec confirmation) ; il ne
+    fonctionne que pour les messages dont le score ne dépasse pas la valeur ci-dessus. Sans adresse, le résumé est
+    informatif et la libération passe par l'administrateur. Seuls les destinataires des domaines déclarés sont notifiés.</p>
+
   <div class="actions"><button type="submit" class="primary">Appliquer</button></div>
 </form>
 {% endblock %}

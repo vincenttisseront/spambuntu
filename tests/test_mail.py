@@ -422,3 +422,75 @@ def test_tls_certificate_generation_is_private_and_never_overwritten(tmp_path):
                          capture_output=True, text=True).stdout
     assert "mx.exemple.fr" in out
     assert mail.ensure_tls_certificate(tmp_path / "t2", "bad host;x") is True          # nom invalide : repli sur « spambuntu »
+
+
+# ----------------------------------------------------------------------------- explication IA, apprentissage, libération restreinte
+
+HEAD_AI = (b"Subject: Virement urgent\nFrom: pdg@societe.test\n"
+           b"X-Spamd-Result: default: False [14.90 / 15.00];\n\tSPAMBUNTU_AI(1.60)[Fraude au pr\xc3\xa9sident probable];\n"
+           b"\tSPAMBUNTU_AI_BEC(0.00)[];\n\tQTEST(9.00)[];\n")
+
+
+class AIQueueRun(QueueRun):
+    def __call__(self, cmd):
+        if cmd[0] == "postcat" and cmd[1] == "-qh":
+            self.calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0, HEAD_AI, b"")
+        if cmd[0] == "postcat" and cmd[1] == "-qb":
+            self.calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0, b"corps du message", b"")
+        return super().__call__(cmd)
+
+
+def test_listing_exposes_ai_explanation_apart_from_symbols():
+    m = quar.listing(AIQueueRun())[0]
+    assert m["ai"] == "Fraude au président probable" and m["ai_flags"] == ["bec"] and m["symbols"] == ["QTEST"]
+
+
+def test_release_with_learning_feeds_ham_and_records_feedback(tmp_path):
+    fed = []
+    quar.act("release", "AAAAAAAAAA1", "admin", AIQueueRun(), tmp_path / "q.log", do_learn=True,
+             feedback_file=tmp_path / "fb.jsonl", feed=lambda label, msg: fed.append((label, msg)) or True)
+    assert fed[0][0] == "ham" and b"Virement urgent" in fed[0][1] and b"corps du message" in fed[0][1]
+    entry = json.loads((tmp_path / "fb.jsonl").read_text())
+    assert entry["label"] == "ham" and entry["learned"] and entry["score"] == 14.9 and "body" not in entry
+
+
+def test_delete_with_learning_feeds_spam(tmp_path):
+    fed = []
+    quar.act("delete", "AAAAAAAAAA1", "admin", AIQueueRun(), tmp_path / "q.log", do_learn=True,
+             feedback_file=tmp_path / "fb.jsonl", feed=lambda label, msg: fed.append(label) or True)
+    assert fed == ["spam"]
+
+
+def test_learning_failure_does_not_block_release(tmp_path):
+    run = AIQueueRun()
+    quar.act("release", "AAAAAAAAAA1", "admin", run, tmp_path / "q.log", do_learn=True,
+             feedback_file=tmp_path / "fb.jsonl", feed=lambda *a: False)
+    assert ["postsuper", "-H", "AAAAAAAAAA1"] in run.calls
+    assert json.loads((tmp_path / "fb.jsonl").read_text())["learned"] is False
+
+
+def test_restricted_release_checks_recipient_and_score(tmp_path):
+    run = AIQueueRun()
+    with pytest.raises(quar.QuarantineError, match="destiné"):
+        quar.act("release", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", recipient="autre@exemple.fr")
+    with pytest.raises(quar.QuarantineError, match="trop suspect"):
+        quar.act("release", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", recipient="moi@exemple.fr", max_score=10)
+    assert not any(c[0] == "postsuper" for c in run.calls)
+    quar.act("release", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", recipient="MOI@exemple.fr", max_score=20)
+    assert ["postsuper", "-H", "AAAAAAAAAA1"] in run.calls
+    assert "(MOI@exemple.fr)" in (tmp_path / "q.log").read_text()
+
+
+def test_restricted_release_refuses_unscored_message(tmp_path):
+    run = QueueRun()                       # en-têtes sans X-Spamd-Result exploitable
+    run.__class__ = type("NoScore", (QueueRun,), {"__call__": lambda self, cmd: subprocess.CompletedProcess(cmd, 0, b"Subject: x\n", b"") if cmd[0] == "postcat" else QueueRun.__call__(self, cmd)})
+    with pytest.raises(quar.QuarantineError, match="trop suspect"):
+        quar.act("release", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", max_score=20)
+
+
+def test_bad_recipient_is_refused(tmp_path):
+    for bad in ("a b@x.test", "x@y.test;id", "<x@y.test>", "x"):
+        with pytest.raises(quar.QuarantineError):
+            quar.act("release", "AAAAAAAAAA1", "digest", QueueRun(), tmp_path / "q.log", recipient=bad)

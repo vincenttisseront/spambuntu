@@ -2,8 +2,8 @@
 """Gestion de la quarantaine (file « hold » de Postfix) pour la console web.
 
   spambuntu-quarantine list [--limit N]
-  spambuntu-quarantine release IDENTIFIANT [--actor NOM]
-  spambuntu-quarantine delete  IDENTIFIANT [--actor NOM]
+  spambuntu-quarantine release IDENTIFIANT [--actor NOM] [--learn] [--recipient ADRESSE] [--max-score N]
+  spambuntu-quarantine delete  IDENTIFIANT [--actor NOM] [--learn]
 
 Exécuté en root via sudo par la console : tout argument est donc validé strictement ici (identifiant
 de file Postfix, nom d'acteur), et une action ne vise que des messages réellement en quarantaine.
@@ -21,6 +21,8 @@ import time
 from pathlib import Path
 
 LOG_FILE = Path("/var/log/spambuntu/quarantine.log")
+FEEDBACK_FILE = Path("/var/lib/spambuntu/mail/feedback.jsonl")
+RCPT_RE = re.compile(r"[^\s<>\"',;()\[\]\\]{1,64}@[A-Za-z0-9.-]{1,255}")
 QUEUE_ID_RE = re.compile(r"[0-9A-Za-z]{6,25}")
 ACTOR_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
 MAX_LIST = 500
@@ -72,6 +74,12 @@ def symbols_of(spamd_result: str, limit: int = 12) -> list:
     return re.findall(r"([A-Z][A-Z0-9_]{2,})\(", spamd_result or "")[:limit]
 
 
+def ai_explanation(spamd_result: str) -> str:
+    """Explication de l'analyse IA, si elle a contribué (option de la règle SPAMBUNTU_AI)."""
+    m = re.search(r"SPAMBUNTU_AI\((-?\d+(?:\.\d+)?)\)\[([^\]]*)\]", spamd_result or "")
+    return re.sub(r"\s+", " ", m.group(2)).strip()[:200] if m else ""
+
+
 def held(run=_run, limit: int = MAX_LIST) -> list:
     res = run(["postqueue", "-j"])
     if res.returncode != 0:
@@ -103,7 +111,9 @@ def listing(run=_run, limit: int = MAX_LIST) -> list:
             "subject": decode_header(h.get("subject", "")),
             "from": decode_header(h.get("from", "")),
             "score": score_of(h.get("x-spamd-result", "")),
-            "symbols": symbols_of(h.get("x-spamd-result", "")),
+            "symbols": [s for s in symbols_of(h.get("x-spamd-result", "")) if not s.startswith("SPAMBUNTU_AI")],
+            "ai": ai_explanation(h.get("x-spamd-result", "")),
+            "ai_flags": [s[len("SPAMBUNTU_AI_"):].lower() for s in symbols_of(h.get("x-spamd-result", "")) if s.startswith("SPAMBUNTU_AI_")],
         })
     return out
 
@@ -117,14 +127,54 @@ def audit(actor: str, action: str, queue_id: str, ok: bool, log_file: Path = LOG
         pass
 
 
-def act(action: str, queue_id: str, actor: str = "console", run=_run, log_file: Path = LOG_FILE) -> str:
+def _feed_rspamd(label: str, message: bytes) -> bool:
+    try:
+        res = subprocess.run(["rspamc", "-h", "127.0.0.1:11334", "learn_ham" if label == "ham" else "learn_spam"],
+                             input=message, capture_output=True, timeout=60, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return res.returncode == 0
+
+
+def learn(label: str, queue_id: str, run, feedback_file: Path, score, symbols, feed=_feed_rspamd) -> bool:
+    """Apprentissage : le retour de l'utilisateur entraîne le filtre bayésien de Rspamd et alimente le corpus de référence."""
+    head, body = run(["postcat", "-qh", queue_id]), run(["postcat", "-qb", queue_id])
+    ok = head.returncode == 0 and body.returncode == 0 and feed(label, head.stdout + b"\n" + body.stdout)
+    try:
+        feedback_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(feedback_file, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"t": int(time.time()), "label": label, "score": score, "symbols": symbols[:15], "learned": ok}) + "\n")
+    except OSError:
+        pass
+    return ok
+
+
+def act(action: str, queue_id: str, actor: str = "console", run=_run, log_file: Path = LOG_FILE, *, do_learn: bool = False,
+        recipient: str = "", max_score=None, feedback_file: Path = FEEDBACK_FILE, feed=_feed_rspamd) -> str:
     if not QUEUE_ID_RE.fullmatch(queue_id):
         raise QuarantineError("Identifiant de message invalide")
     if not ACTOR_RE.fullmatch(actor):
         raise QuarantineError("Nom d'acteur invalide")
-    if queue_id not in {d["queue_id"] for d in held(run)}:
+    if recipient and not RCPT_RE.fullmatch(recipient):
+        raise QuarantineError("Destinataire invalide")
+    item = next((d for d in held(run) if d["queue_id"] == queue_id), None)
+    if item is None:
         audit(actor, action, queue_id, False, log_file)
         raise QuarantineError("Ce message n'est plus en quarantaine")
+    head = run(["postcat", "-qh", queue_id])
+    fields = headers_of(head.stdout[:HEADER_BYTES]) if head.returncode == 0 else {}
+    score = score_of(fields.get("x-spamd-result", ""))
+    if recipient:
+        recipients = {str(r.get("address", "")).lower() for r in item.get("recipients", [])}
+        if recipient.lower() not in recipients:
+            audit(actor, action, queue_id, False, log_file)
+            raise QuarantineError("Ce message n'est pas destiné à cette adresse")
+    if max_score is not None and (score is None or score > max_score):
+        audit(actor, action, queue_id, False, log_file)
+        raise QuarantineError("Ce message est trop suspect pour être libéré depuis le résumé : contactez l'administrateur")
+    if do_learn:
+        learn("ham" if action == "release" else "spam", queue_id, run, feedback_file, score,
+              symbols_of(fields.get("x-spamd-result", "")), feed)
     if action == "release":
         res = run(["postsuper", "-H", queue_id])
         if res.returncode == 0:
@@ -136,7 +186,7 @@ def act(action: str, queue_id: str, actor: str = "console", run=_run, log_file: 
     else:
         raise QuarantineError("Action inconnue")
     ok = res.returncode == 0
-    audit(actor, action, queue_id, ok, log_file)
+    audit(actor + (f" ({recipient})" if recipient else ""), action, queue_id, ok, log_file)
     if not ok:
         raise QuarantineError("L'opération a échoué (voir les journaux de Postfix)")
     return message
@@ -151,12 +201,18 @@ def main(argv=None) -> int:
         p = sub.add_parser(name)
         p.add_argument("queue_id")
         p.add_argument("--actor", default="console")
+        p.add_argument("--learn", action="store_true")
+        if name == "release":
+            p.add_argument("--recipient", default="")
+            p.add_argument("--max-score", type=float, default=None)
     args = ap.parse_args(argv)
     try:
         if args.cmd == "list":
             print(json.dumps({"ok": True, "messages": listing(limit=max(1, min(args.limit, MAX_LIST)))}, ensure_ascii=False))
         else:
-            print(json.dumps({"ok": True, "message": act(args.cmd, args.queue_id, args.actor)}, ensure_ascii=False))
+            message = act(args.cmd, args.queue_id, args.actor, do_learn=args.learn,
+                          recipient=getattr(args, "recipient", ""), max_score=getattr(args, "max_score", None))
+            print(json.dumps({"ok": True, "message": message}, ensure_ascii=False))
     except QuarantineError as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
         return 1

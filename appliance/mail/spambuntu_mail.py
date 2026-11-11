@@ -40,6 +40,10 @@ DEFAULTS = {
     "verify_recipients": True,
     "max_message_mb": 50,
     "trusted_networks": [],
+    "digest_enabled": False,            # résumé quotidien de quarantaine envoyé aux destinataires
+    "digest_from": "",                  # expéditeur du résumé (vide : quarantaine@<nom d'hôte>)
+    "digest_base_url": "",              # https://hôte[:port] de la console, pour les liens de libération (vide : sans liens)
+    "digest_release_max_score": 10.0,   # score au-delà duquel un message n'est pas libérable depuis le résumé
 }
 
 _LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
@@ -133,6 +137,18 @@ def validate(raw) -> dict:
     if not isinstance(cfg["verify_recipients"], bool):
         raise MailError("Option de vérification des destinataires invalide")
     cfg["max_message_mb"] = int(_number(cfg["max_message_mb"], "Taille maximale des messages (Mo)", 1, 500))
+
+    if not isinstance(cfg["digest_enabled"], bool):
+        raise MailError("Option du résumé quotidien invalide")
+    sender = cfg["digest_from"]
+    if sender != "" and not (isinstance(sender, str) and re.fullmatch(r"[A-Za-z0-9._+-]{1,64}@" + _LABEL + r"(?:\." + _LABEL + r")+", sender)):
+        raise MailError("Expéditeur du résumé invalide")
+    base = cfg["digest_base_url"]
+    if base != "":
+        m = re.fullmatch(r"https://(" + _LABEL + r"(?:\." + _LABEL + r")*|\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?", base if isinstance(base, str) else "")
+        if not m or (m.group(2) and not 1 <= int(m.group(2)) <= 65535):
+            raise MailError("Adresse de la console invalide (https://hôte[:port])")
+    cfg["digest_release_max_score"] = _number(cfg["digest_release_max_score"], "Score maximal de libération", 0, 100)
 
     networks = cfg["trusted_networks"]
     if not isinstance(networks, list) or len(networks) > MAX_NETWORKS:

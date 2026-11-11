@@ -26,6 +26,7 @@ RELEASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RELEASE_DIR / "updater"))
 sys.path.insert(0, str(RELEASE_DIR / "mail"))
 import spambuntu_ai as aicfg  # noqa: E402
+import spambuntu_digest as digest  # noqa: E402
 import spambuntu_mail as mailcfg  # noqa: E402
 import spambuntu_quarantine as quarantine  # noqa: E402
 import spambuntu_update as upd  # noqa: E402
@@ -142,6 +143,10 @@ def parse_mail_form(form) -> dict:
         "verify_recipients": form.get("verify_recipients") == "on",
         "max_message_mb": form.get("max_message_mb", ""),
         "trusted_networks": networks,
+        "digest_enabled": form.get("digest_enabled") == "on",
+        "digest_from": (form.get("digest_from") or "").strip(),
+        "digest_base_url": (form.get("digest_base_url") or "").strip().rstrip("/"),
+        "digest_release_max_score": form.get("digest_release_max_score") or "10",
     }
 
 
@@ -187,6 +192,8 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
 
     @app.before_request
     def protect_against_csrf():
+        if request.endpoint == "digest_release":
+            return          # sans session : protégé par le jeton signé du lien
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             expected = session.get("csrf") or ""
             sent = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token", "")
@@ -348,6 +355,35 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
             flash("success", "Configuration envoyée : application en cours…")
         return redirect(url_for("mail_page"))
 
+    def digest_page(status: int, **ctx):
+        response = app.make_response((render_template("digest.html", **ctx), status))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.get("/digest/<token>")
+    def digest_confirm(token):
+        try:
+            _, rcpt = digest.verify_token(secret, token)
+        except digest.DigestError as exc:
+            return digest_page(400, error=str(exc))
+        return digest_page(200, rcpt=rcpt, token=token)
+
+    @app.post("/digest/<token>")
+    def digest_release(token):
+        try:
+            queue_id, rcpt = digest.verify_token(secret, token)
+        except digest.DigestError as exc:
+            return digest_page(400, error=str(exc))
+        try:
+            limit = mailcfg.load_config(Path(app.config["MAIL_CONF"]))["digest_release_max_score"]
+        except mailcfg.MailError:
+            limit = 0
+        result = app.config["QUARANTINE_RUNNER"](["release", queue_id, "--actor", "digest", "--recipient", rcpt,
+                                                    "--max-score", str(limit)])
+        if result.get("ok"):
+            return digest_page(200, done=True)
+        return digest_page(400, error=result.get("error") or "Échec")
+
     @app.get("/ia")
     @login_required
     def ai_page():
@@ -401,7 +437,10 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         if not quarantine.QUEUE_ID_RE.fullmatch(queue_id):
             flash("error", "Identifiant de message invalide")
             return redirect(url_for("quarantine_page"))
-        result = app.config["QUARANTINE_RUNNER"]([action, queue_id, "--actor", session.get("user", "console")])
+        args = [action, queue_id, "--actor", session.get("user", "console")]
+        if request.form.get("learn") == "1":
+            args.append("--learn")
+        result = app.config["QUARANTINE_RUNNER"](args)
         flash("success" if result.get("ok") else "error", result.get("message") or result.get("error") or "Échec")
         return redirect(url_for("quarantine_page"))
 

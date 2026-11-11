@@ -36,7 +36,7 @@ local id = rspamd_config:register_symbol({
         -- L'IA ne peut pas, seule, faire rejeter définitivement un message : au plus la quarantaine.
         local ceiling = (reject_at or 15) - 0.1 - score
         if points > ceiling then points = math.max(ceiling, 0) end
-        local explanation = type(res.explanation) == "string" and res.explanation:sub(1, 200) or ""
+        local explanation = type(res.explanation) == "string" and res.explanation:gsub("[%[%];,\r\n]", " "):sub(1, 200) or ""
         task:insert_result("SPAMBUNTU_AI", points, explanation)
         if type(res.symbols) == "table" then
           for _, sym in ipairs(res.symbols) do

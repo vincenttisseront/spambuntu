@@ -260,6 +260,8 @@ def test_real_bundle_update_end_to_end(env, repo_copy, monkeypatch):
     assert (dest / "var/lib/spambuntu/mail/user").is_dir()                                 # créé par install.sh --refresh
     assert (dest / "usr/local/sbin/spambuntu-quarantine").is_file()
     assert (dest / "usr/local/sbin/spambuntu-ai").is_file()
+    assert (dest / "usr/local/sbin/spambuntu-digest").is_file()
+    assert (dest / "etc/systemd/system/spambuntu-digest.timer").is_file()
     assert (dest / "etc/systemd/system/spambuntu-ai.service").is_file()
     assert (dest / "etc/systemd/system/spambuntu-mail-apply.service").is_file()
     log = env.log.read_text()

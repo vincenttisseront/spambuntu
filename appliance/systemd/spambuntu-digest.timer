@@ -1,0 +1,10 @@
+[Unit]
+Description=Résumé quotidien de quarantaine Spambuntu
+
+[Timer]
+OnCalendar=*-*-* 07:30:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

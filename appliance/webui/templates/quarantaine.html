@@ -15,16 +15,19 @@
     <dt>Reçu</dt><dd>{{ m.arrived | int | timestamp }}</dd>
     <dt>Taille</dt><dd>{{ (m.size / 1024) | round(1) }} Ko</dd>
     <dt>Score</dt><dd>{{ m.score if m.score is not none else '?' }}</dd>
+    {% if m.ai %}<dt>Analyse IA</dt><dd>{{ m.ai }}{% if m.ai_flags %} <span class="muted">({{ m.ai_flags | join(', ') }})</span>{% endif %}</dd>{% endif %}
     {% if m.symbols %}<dt>Règles</dt><dd>{{ m.symbols | join(', ') }}</dd>{% endif %}
   </dl>
   <div class="actions">
     <form method="post" action="{{ url_for('quarantine_action', action='release') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="queue_id" value="{{ m.id }}">
-      <button type="submit" class="primary">Libérer</button>
+      <button type="submit" name="learn" value="1" class="primary" title="Libère le message et apprend qu'il est légitime">Légitime : libérer</button>
+      <button type="submit" name="learn" value="0" title="Libère sans modifier l'apprentissage">Libérer seulement</button>
     </form>
     <form method="post" action="{{ url_for('quarantine_action', action='delete') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="queue_id" value="{{ m.id }}">
-      <button type="submit" class="danger">Supprimer</button>
+      <button type="submit" name="learn" value="1" class="danger" title="Supprime le message et apprend que c'est du spam">Spam : supprimer</button>
+      <button type="submit" name="learn" value="0" class="danger" title="Supprime sans modifier l'apprentissage">Supprimer seulement</button>
     </form>
   </div>
 </section>

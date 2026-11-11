@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Libération d'un message · Spambuntu{% endblock %}
+{% block content %}
+<section class="card login">
+  <h1>Spambuntu</h1>
+  {% if error %}
+    <p class="banner error" role="alert">{{ error }}</p>
+  {% elif done %}
+    <p class="banner success" role="status">Le message a été libéré : il va vous être livré.</p>
+  {% else %}
+    <p>Libérer le message retenu en quarantaine pour <strong>{{ rcpt }}</strong> ?</p>
+    <p class="muted small">Ne le faites que si vous attendiez ce message et reconnaissez l'expéditeur.</p>
+    <form method="post" action="{{ url_for('digest_release', token=token) }}">
+      <button type="submit" class="primary">Oui, libérer ce message</button>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}
