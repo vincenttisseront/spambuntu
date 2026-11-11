@@ -81,6 +81,36 @@ Une appliance qui n'est pas installée par l'ISO s'installe depuis l'archive d'u
 spambuntu-update verify        # télécharge la dernière release, contrôle la signature avec la clé de l'appliance
 ```
 
+## Passerelle de messagerie (0.2.0)
+
+L'appliance se place **devant** votre serveur de messagerie : le MX de vos domaines pointe vers elle,
+elle filtre, puis transmet le courrier sain à votre serveur.
+
+```
+Internet ──► Postfix (25) ──► Rspamd (score) ──► serveur de messagerie
+                  │               ├─ score < marquage     : livré tel quel
+                  │               ├─ marquage ≤ score     : livré avec « X-Spam: Yes »
+                  │               ├─ quarantaine ≤ score  : retenu (page Quarantaine)
+                  │               └─ rejet ≤ score        : refusé à l'expéditeur (554)
+```
+
+Dans la console : **Messagerie** (domaines et serveur de destination, seuils, réseaux de confiance) et
+**Quarantaine** (lire, libérer, supprimer). Par défaut aucun domaine n'est déclaré : l'appliance ne relaie
+rien tant que vous n'en avez pas ajouté (jamais de relais ouvert). Si Rspamd est indisponible, les messages
+sont différés (jamais livrés sans analyse).
+
+Choix de conception :
+- La console ne modifie rien dans `/etc` : elle dépose une demande que `spambuntu-mail-apply.service`
+  (root) **revalide** avant d'écrire la configuration de Postfix et de Rspamd. Si Postfix ou Rspamd la
+  refusent (`postfix check`, `rspamadm configtest`), l'ancienne configuration est rétablie.
+- La quarantaine est la file « hold » de Postfix, alimentée par Rspamd via le milter : un expéditeur ne peut
+  pas forcer ni empêcher la quarantaine avec un en-tête forgé. Chaque libération ou suppression est
+  journalisée dans `/var/log/spambuntu/quarantine.log`.
+- Le greylisting de Rspamd est désactivé (il retarde le premier message de tout nouvel expéditeur).
+
+Pas encore couvert : TLS entrant, vérification des destinataires auprès de votre serveur (un destinataire
+inexistant est accepté puis refusé en aval), signature DKIM sortante, résumé quotidien de quarantaine.
+
 ## Publier une version
 
 ```bash
