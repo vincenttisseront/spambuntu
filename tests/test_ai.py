@@ -184,3 +184,122 @@ def test_cli_show_refuses_bad_config(tmp_path, monkeypatch, capsys):
     real = ai.load_config
     monkeypatch.setattr(ai, "load_config", lambda path=f: real(path))
     assert ai.main(["show"]) == 1 and "https" in capsys.readouterr().out
+
+
+# ----------------------------------------------------------------------------- application depuis la console
+
+import os  # noqa: E402
+import subprocess  # noqa: E402
+
+from test_webui import auth, csrf, web  # noqa: E402,F401  (fixtures)
+
+
+@pytest.fixture
+def paths(tmp_path):
+    return {"conf": tmp_path / "etc" / "ai.json", "token_path": tmp_path / "etc" / "ai.token",
+            "ca_path": tmp_path / "etc" / "ca.pem", "status": tmp_path / "state" / "ai-status.json",
+            "request": tmp_path / "state" / "ai-request.json"}
+
+
+def send(paths, body, checker=lambda: (True, "")):
+    paths["request"].parent.mkdir(parents=True, exist_ok=True)
+    paths["request"].write_text(json.dumps(body))
+    return ai.apply_request(paths["request"], paths["conf"], paths["token_path"], paths["ca_path"], paths["status"], checker)
+
+
+BASE = {"mode": "active", "endpoint": "https://ollama.example.test", "model_fast": "m"}
+
+
+def test_apply_writes_config_and_token(paths):
+    res = send(paths, {**BASE, "token": "s3cret"})
+    assert res["ok"] and "réussie" in res["message"]
+    assert json.loads(paths["conf"].read_text())["endpoint"] == "https://ollama.example.test"
+    assert "token" not in paths["conf"].read_text()
+    assert oct(paths["token_path"].stat().st_mode & 0o777) == "0o600" and paths["token_path"].read_text().strip() == "s3cret"
+    assert not paths["request"].exists()                                    # la demande (avec le jeton) est supprimée
+    assert json.loads(paths["status"].read_text())["ok"]
+
+
+def test_apply_keeps_token_when_empty_and_clears_on_demand(paths):
+    send(paths, {**BASE, "token": "abc"})
+    send(paths, {**BASE, "token": ""})
+    assert paths["token_path"].read_text().strip() == "abc"
+    send(paths, {**BASE, "clear_token": True})
+    assert not paths["token_path"].exists()
+
+
+def test_apply_rejects_bad_input_and_changes_nothing(paths):
+    for bad in ({**BASE, "endpoint": "http://clair.test"}, {**BASE, "token": "a b\nc"}, {**BASE, "ca_pem": "pas un certificat"},
+                {**BASE, "ca_file": "/etc/passwd"}, {**BASE, "token": 5}):
+        res = send(paths, bad)
+        assert not res["ok"]
+    assert not paths["conf"].exists() and not paths["token_path"].exists()
+    assert not json.loads(paths["status"].read_text())["ok"]
+
+
+def test_apply_reports_failed_connection(paths):
+    res = send(paths, BASE, checker=lambda: (False, "Appel impossible : SSLError"))
+    assert not res["ok"] and "échec" in res["message"] and paths["conf"].exists()
+
+
+def test_apply_off_skips_check(paths):
+    called = []
+    res = send(paths, {"mode": "off"}, checker=lambda: called.append(1) or (True, ""))
+    assert res["ok"] and not called
+
+
+def test_apply_request_must_be_fresh_regular_file(paths):
+    paths["request"].parent.mkdir(parents=True)
+    paths["request"].write_text(json.dumps(BASE))
+    os.utime(paths["request"], (1, 1))
+    assert not ai.apply_request(paths["request"], paths["conf"], paths["token_path"], paths["ca_path"], paths["status"])["ok"]
+    link = paths["request"].parent / "link.json"
+    link.symlink_to(paths["conf"])
+    assert not ai.apply_request(link, paths["conf"], paths["token_path"], paths["ca_path"], paths["status"])["ok"]
+
+
+def test_apply_accepts_valid_ca(paths, tmp_path):
+    key, crt = tmp_path / "k.pem", tmp_path / "c.pem"
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(key), "-out", str(crt),
+                    "-days", "2", "-subj", "/CN=ca.test"], check=True, capture_output=True)
+    res = send(paths, {**BASE, "ca_pem": crt.read_text()})
+    assert res["ok"] and paths["ca_path"].read_text().startswith("-----BEGIN CERTIFICATE-----")
+    assert json.loads(paths["conf"].read_text())["ca_file"] == str(paths["ca_path"])
+
+
+@pytest.fixture
+def aiweb(auth, tmp_path):
+    auth.app.config.update(AI_CONF=str(tmp_path / "ai.json"), AI_TOKEN=str(tmp_path / "ai.token"), AI_STATE=str(tmp_path / "aistate"))
+    (tmp_path / "aistate").mkdir()
+    auth.started = []
+    auth.app.config["UNIT_STARTER"] = lambda unit: (auth.started.append(unit) or (True, ""))
+    auth.ai_state = tmp_path / "aistate"
+    return auth
+
+
+FORM = {"mode": "shadow", "endpoint": "https://ollama.example.test:11434", "model_fast": "llama3.2:3b", "model_deep": "",
+        "ambiguous_min": "3", "ambiguous_max": "12", "max_add": "6", "max_calls_per_hour": "300", "timeout_s": "20",
+        "internal_domains": "societe.test\n", "token": "tok-123", "ca_pem": ""}
+
+
+def test_ai_page_and_save(aiweb):
+    assert aiweb.client.get("/ia").status_code == 200
+    res = aiweb.client.post("/ia", data={**FORM, "csrf_token": csrf(aiweb.client, "/ia")})
+    assert res.status_code == 302 and aiweb.started == ["spambuntu-ai-apply.service"]
+    request_file = aiweb.ai_state / "ai-request.json"
+    assert oct(request_file.stat().st_mode & 0o777) == "0o600"
+    assert json.loads(request_file.read_text())["token"] == "tok-123"
+    page = aiweb.client.get("/ia").get_data(as_text=True)
+    assert "tok-123" not in page and "en cours d'application" in page
+
+
+def test_ai_save_rejects_bad_values_without_request(aiweb):
+    token = csrf(aiweb.client, "/ia")
+    for bad in ({"endpoint": "http://clair.test"}, {"max_add": "beaucoup"}, {"model_fast": "a;b"}):
+        aiweb.client.post("/ia", data={**FORM, **bad, "csrf_token": token})
+    assert not (aiweb.ai_state / "ai-request.json").exists() and aiweb.started == []
+
+
+def test_ai_page_requires_login(web):
+    assert web.client.get("/ia").status_code == 302
+    assert web.client.post("/ia", data={}).status_code in (302, 400, 403)

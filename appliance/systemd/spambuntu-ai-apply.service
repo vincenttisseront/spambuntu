@@ -1,0 +1,9 @@
+[Unit]
+Description=Spambuntu - application de la configuration de l'analyse IA
+# Démarrée par la console web via sudo (voir sudoers) : la console dépose une demande, ce service la valide
+# à nouveau en root avant d'écrire la configuration, le jeton et le certificat d'autorité.
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/spambuntu-ai apply --from-request
+TimeoutStartSec=3min

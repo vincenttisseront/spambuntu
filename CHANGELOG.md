@@ -12,6 +12,8 @@ console web de l'appliance au moment de proposer la mise à jour.
   disponible) : anonymisation avant envoi, contenu isolé contre l'injection de prompt, réponse JSON stricte,
   l'IA ne peut qu'ajouter du risque et jamais, seule, faire rejeter un message, budget horaire,
   disjoncteur, journal d'audit des envois, cascade petit/gros modèle.
+- Page « IA » de la console : mode, serveur, jeton (écriture seule), autorité de certification privée, modèles,
+  limites ; la configuration est appliquée par un service root qui teste la connexion.
 
 ## [0.2.0] - 2026-11-11
 

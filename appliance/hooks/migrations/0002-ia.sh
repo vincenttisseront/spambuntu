@@ -6,8 +6,11 @@ set -euo pipefail
 id spambuntu-ai >/dev/null 2>&1 ||
     useradd --system --home-dir /var/lib/spambuntu/ai --no-create-home --shell /usr/sbin/nologin spambuntu-ai
 install -d -m 0750 -o spambuntu-ai -g spambuntu-ai /var/lib/spambuntu/ai /var/log/spambuntu/ai
+install -d -m 0755 -o spambuntu -g spambuntu /var/lib/spambuntu/aiconf
+install -d -m 0755 -o root -g root /etc/spambuntu-ai
 install -D -m 0644 /opt/spambuntu/current/ai/rspamd/spambuntu_ai.lua /etc/rspamd/local.d/rspamd.lua
-[ -s /etc/spambuntu/ai.json ] || { echo '{"mode": "off"}' > /etc/spambuntu/ai.json; chown root:spambuntu-ai /etc/spambuntu/ai.json; chmod 0640 /etc/spambuntu/ai.json; }
+[ -s /etc/spambuntu-ai/ai.json ] || echo '{"mode": "off"}' > /etc/spambuntu-ai/ai.json
+chmod 0644 /etc/spambuntu-ai/ai.json
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload
     systemctl enable --now spambuntu-ai.service

@@ -4,6 +4,7 @@
   spambuntu-ai analyze [--symbols A,B] [--score N] < message.eml      (JSON sur la sortie standard)
   spambuntu-ai check                                                   (teste le point d'accès)
   spambuntu-ai show                                                    (configuration active)
+  spambuntu-ai apply --from-request                                    (root : demande déposée par la console)
 
 Principes de sécurité (le message est une entrée hostile, le serveur LLM est un tiers) :
   * rien ne part sans anonymisation : adresses, IBAN, cartes, téléphones, IP, chemins d'URL, grands nombres ;
@@ -37,10 +38,15 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-CONF_PATH = Path("/etc/spambuntu/ai.json")
-TOKEN_PATH = Path("/etc/spambuntu/ai.token")
+CONF_PATH = Path("/etc/spambuntu-ai/ai.json")
+TOKEN_PATH = Path("/etc/spambuntu-ai/ai.token")
 STATE_DIR = Path("/var/lib/spambuntu/ai")
 AUDIT_LOG = Path("/var/log/spambuntu/ai/ai.log")
+CA_PATH = Path("/etc/spambuntu-ai/ca.pem")
+CONSOLE_DIR = Path("/var/lib/spambuntu/aiconf")          # seul répertoire inscriptible par la console
+REQUEST_MAX_AGE = 600
+TOKEN_RE = re.compile(r"[\x21-\x7e]{1,500}")
+PEM_RE = re.compile(r"(-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\s]+-----END CERTIFICATE-----\s*){1,5}")
 
 DEFAULTS = {
     "mode": "off",                      # off | shadow (journal sans effet) | active
@@ -501,6 +507,123 @@ def analyze(raw: bytes, cfg: dict, rspamd_score=None, rspamd_symbols=(), token: 
     return result
 
 
+# ----------------------------------------------------------------------------- application depuis la console (root)
+
+def read_request(path: Path) -> dict:
+    """Demande déposée par la console : fichier ordinaire, non lié symboliquement, récent, de taille bornée."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise AIError(f"Demande illisible : {exc.strerror}") from None
+    with os.fdopen(fd, "rb") as fh:
+        st = os.fstat(fh.fileno())
+        if not os.path.isfile(path) or st.st_size > 64 * 1024:
+            raise AIError("Demande invalide")
+        if time.time() - st.st_mtime > REQUEST_MAX_AGE:
+            raise AIError("Demande périmée : renvoyez-la depuis la console")
+        try:
+            data = json.loads(fh.read().decode("utf-8"))
+        except ValueError:
+            raise AIError("Demande illisible") from None
+    if not isinstance(data, dict):
+        raise AIError("Demande invalide")
+    return data
+
+
+def _write(path: Path, data: str, mode: int, owner: tuple | None = None) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".tmp-{secrets.token_hex(4)}")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(data)
+        os.chmod(tmp, mode)
+        if owner:
+            try:
+                import grp
+                import pwd
+                os.chown(tmp, pwd.getpwnam(owner[0]).pw_uid, grp.getgrnam(owner[1]).gr_gid)
+            except (KeyError, OSError):
+                pass
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def apply_request(request: Path, conf: Path = CONF_PATH, token_path: Path = TOKEN_PATH, ca_path: Path = CA_PATH,
+                  status: Path | None = None, checker=None) -> dict:
+    """Valide la demande, écrit configuration / jeton / autorité, puis teste la connexion (sous le compte du service)."""
+    status = status or CONSOLE_DIR / "ai-status.json"
+    try:
+        raw = read_request(request)
+        token = raw.pop("token", "")
+        clear_token = bool(raw.pop("clear_token", False))
+        ca_pem = raw.pop("ca_pem", "")
+        if not isinstance(token, str) or not isinstance(ca_pem, str):
+            raise AIError("Demande invalide")
+        if token and not TOKEN_RE.fullmatch(token):
+            raise AIError("Jeton d'API invalide (caractères ASCII visibles, 500 au plus)")
+        if ca_pem.strip():
+            if not PEM_RE.fullmatch(ca_pem.strip()):
+                raise AIError("Certificat d'autorité invalide (format PEM attendu)")
+            try:
+                ssl.create_default_context(cadata=ca_pem.strip())
+            except (ssl.SSLError, ValueError):
+                raise AIError("Certificat d'autorité illisible") from None
+            raw["ca_file"] = str(ca_path)
+        elif raw.get("ca_file") not in ("", None, str(ca_path)):
+            raise AIError("Le fichier d'autorité ne peut pas être choisi depuis la console")
+        cfg = validate(raw)
+    except AIError as exc:
+        result = {"ok": False, "message": str(exc)}
+        _status(status, result)
+        return result
+    if ca_pem.strip():
+        _write(ca_path, ca_pem.strip() + "\n", 0o644)
+    if clear_token:
+        try:
+            token_path.unlink()
+        except FileNotFoundError:
+            pass
+    elif token:
+        _write(token_path, token + "\n", 0o600, ("spambuntu-ai", "spambuntu-ai"))
+    _write(conf, json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", 0o644)
+    try:
+        request.unlink()
+    except OSError:
+        pass
+    message = "Configuration enregistrée"
+    ok = True
+    if cfg["mode"] != "off":
+        ok, detail = (checker or _check_as_service)()
+        message += " ; connexion au serveur d'IA : " + ("réussie" if ok else f"échec ({detail})")
+    result = {"ok": ok, "message": message}
+    _status(status, result)
+    return result
+
+
+def _check_as_service() -> tuple:
+    import subprocess
+    try:
+        r = subprocess.run(["runuser", "-u", "spambuntu-ai", "--", "/usr/local/sbin/spambuntu-ai", "check"],
+                           capture_output=True, text=True, timeout=90, check=False)
+        data = json.loads(r.stdout or "{}")
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return False, "test impossible"
+    return bool(data.get("ok")), str(data.get("error", ""))[:200]
+
+
+def _status(path: Path, result: dict) -> None:
+    try:
+        _write(path, json.dumps({**result, "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, ensure_ascii=False), 0o644)
+    except OSError:
+        pass
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="spambuntu-ai", description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -509,7 +632,16 @@ def main(argv=None) -> int:
     a.add_argument("--symbols", default="")
     sub.add_parser("check")
     sub.add_parser("show")
+    ap_apply = sub.add_parser("apply")
+    ap_apply.add_argument("--from-request", action="store_true", required=True)
     args = ap.parse_args(argv)
+    if args.cmd == "apply":
+        if os.geteuid() != 0:
+            print(json.dumps({"ok": False, "error": "Cette commande doit être exécutée en root"}))
+            return 1
+        result = apply_request(CONSOLE_DIR / "ai-request.json")
+        print(json.dumps(result, ensure_ascii=False))
+        return 0 if result["ok"] else 1
     try:
         cfg = load_config()
         if args.cmd == "show":

@@ -91,6 +91,7 @@ setup_dirs() {
     mkd 0755 spambuntu:spambuntu "$VAR/mail/user"       # demandes de la console (messagerie)
     mkd 0755 root:root "$LOG"
     mkd 0750 spambuntu-ai:spambuntu-ai "$VAR/ai"
+    mkd 0755 spambuntu:spambuntu "$VAR/aiconf"              # demandes de la console (IA)
     mkd 0750 spambuntu-ai:spambuntu-ai "$LOG/ai"             # journal d'audit des envois au LLM
 }
 
@@ -214,8 +215,9 @@ install_ai() {
     # Règle Rspamd (fichier géré par Spambuntu) et configuration par défaut : IA désactivée.
     [ -z "$D" ] || return 0
     install -D -m 0644 "$SRC/ai/rspamd/spambuntu_ai.lua" /etc/rspamd/local.d/rspamd.lua
-    [ -s "$ETC/ai.json" ] || install -m 0640 -o root -g spambuntu-ai /dev/null "$ETC/ai.json"
-    [ -s "$ETC/ai.json" ] || echo '{"mode": "off"}' > "$ETC/ai.json"
+    install -d -m 0755 -o root -g root /etc/spambuntu-ai
+    [ -s /etc/spambuntu-ai/ai.json ] || echo '{"mode": "off"}' > /etc/spambuntu-ai/ai.json
+    chmod 0644 /etc/spambuntu-ai/ai.json
 }
 
 enable_services() {

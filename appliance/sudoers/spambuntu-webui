@@ -9,6 +9,7 @@ Cmnd_Alias SPAMBUNTU_UPDATE = \
     /usr/bin/systemctl start --no-block spambuntu-update-rollback.service
 Cmnd_Alias SPAMBUNTU_MAIL = \
     /usr/bin/systemctl start --no-block spambuntu-mail-apply.service, \
+    /usr/bin/systemctl start --no-block spambuntu-ai-apply.service, \
     /usr/local/sbin/spambuntu-quarantine list, \
     /usr/local/sbin/spambuntu-quarantine release * --actor *, \
     /usr/local/sbin/spambuntu-quarantine delete * --actor *, \

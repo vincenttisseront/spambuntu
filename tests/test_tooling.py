@@ -169,7 +169,7 @@ def test_fresh_install_into_destdir_then_login(repo_copy, tmp_path):
     assert oct(sudoers.stat().st_mode & 0o777) == "0o440"
     assert "NOPASSWD: SPAMBUNTU_UPDATE" in sudoers.read_text()
     allowed = re.findall(r"/usr/bin/systemctl start --no-block (\S+?)\.service", sudoers.read_text())
-    assert allowed == ["spambuntu-update-apply", "spambuntu-update-rollback", "spambuntu-mail-apply"]   # exactement ces unités
+    assert allowed == ["spambuntu-update-apply", "spambuntu-update-rollback", "spambuntu-mail-apply", "spambuntu-ai-apply"]   # exactement ces unités
     commands = re.findall(r"^\s+(/\S+)", sudoers.read_text(), re.M)
     assert set(commands) == {"/usr/bin/systemctl", "/usr/local/sbin/spambuntu-quarantine", "/usr/local/sbin/spambuntu-mailstats"}    # rien d'autre
     assert "spambuntu-quarantine list," in sudoers.read_text().replace("\\\n", "")

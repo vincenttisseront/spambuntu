@@ -25,6 +25,7 @@ from werkzeug.security import check_password_hash
 RELEASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RELEASE_DIR / "updater"))
 sys.path.insert(0, str(RELEASE_DIR / "mail"))
+import spambuntu_ai as aicfg  # noqa: E402
 import spambuntu_mail as mailcfg  # noqa: E402
 import spambuntu_quarantine as quarantine  # noqa: E402
 import spambuntu_update as upd  # noqa: E402
@@ -40,6 +41,7 @@ LOGIN_MAX_FAILURES = 8
 APPLY_UNIT = "spambuntu-update-apply.service"
 ROLLBACK_UNIT = "spambuntu-update-rollback.service"
 MAIL_UNIT = "spambuntu-mail-apply.service"
+AI_UNIT = "spambuntu-ai-apply.service"
 QUARANTINE_BIN = "/usr/local/sbin/spambuntu-quarantine"
 STATS_BIN = "/usr/local/sbin/spambuntu-mailstats"
 STATS_WINDOWS = {"24": 24, "72": 72, "168": 168}
@@ -97,6 +99,29 @@ def run_quarantine_via_sudo(args: list) -> dict:
         return {"ok": False, "error": "Le service de quarantaine ne répond pas"}
 
 
+def parse_ai_form(form) -> dict:
+    """Formulaire de l'analyse IA -> demande brute (validation stricte par spambuntu_ai)."""
+    def number(name, cast):
+        try:
+            return cast(form.get(name, "").strip().replace(",", "."))
+        except ValueError:
+            raise aicfg.AIError(f"Valeur numérique invalide : {name}") from None
+
+    data = {
+        "mode": form.get("mode", "off"), "endpoint": (form.get("endpoint") or "").strip(),
+        "model_fast": (form.get("model_fast") or "").strip(), "model_deep": (form.get("model_deep") or "").strip(),
+        "ambiguous_min": number("ambiguous_min", float), "ambiguous_max": number("ambiguous_max", float),
+        "max_add": number("max_add", float), "max_calls_per_hour": number("max_calls_per_hour", int),
+        "timeout_s": number("timeout_s", int),
+        "internal_domains": [d.strip() for d in (form.get("internal_domains") or "").replace(",", "\n").splitlines() if d.strip()],
+        "ca_pem": (form.get("ca_pem") or "").strip(), "token": form.get("token") or "",
+        "clear_token": form.get("clear_token") == "on",
+    }
+    if data["ca_pem"] == "":
+        data["ca_file"] = form.get("ca_file", "")
+    return data
+
+
 def parse_mail_form(form) -> dict:
     """Transforme le formulaire en configuration brute (la validation stricte est faite par spambuntu_mail)."""
     domains = []
@@ -144,6 +169,9 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         STATS_RUNNER=run_stats_via_sudo,
         MAIL_CONF=os.environ.get("SPAMBUNTU_MAIL_CONF", "/etc/spambuntu/mail.json"),
         MAIL_STATE=os.environ.get("SPAMBUNTU_MAIL_STATE", "/var/lib/spambuntu/mail"),
+        AI_CONF=os.environ.get("SPAMBUNTU_AI_CONF", str(aicfg.CONF_PATH)),
+        AI_TOKEN=os.environ.get("SPAMBUNTU_AI_TOKEN", str(aicfg.TOKEN_PATH)),
+        AI_STATE=os.environ.get("SPAMBUNTU_AI_STATE", str(aicfg.CONSOLE_DIR)),
     )
     failures: dict = {}
 
@@ -319,6 +347,42 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         else:
             flash("success", "Configuration envoyée : application en cours…")
         return redirect(url_for("mail_page"))
+
+    @app.get("/ia")
+    @login_required
+    def ai_page():
+        try:
+            current = aicfg.load_config(Path(app.config["AI_CONF"]))
+        except aicfg.AIError:
+            current = aicfg.validate({})
+        state = Path(app.config["AI_STATE"])
+        return render_template("ia.html", active="ai", cfg=current, status=upd.read_json(state / "ai-status.json", None),
+                               pending=(state / "ai-request.json").exists(),
+                               token_set=Path(app.config["AI_TOKEN"]).exists(),
+                               ca_set=bool(current["ca_file"]), domains_text="\n".join(current["internal_domains"]))
+
+    @app.post("/ia")
+    @login_required
+    def ai_save():
+        try:
+            new = parse_ai_form(request.form)
+            check = {k: v for k, v in new.items() if k not in ("token", "clear_token", "ca_pem")}
+            if new["ca_pem"]:
+                check["ca_file"] = str(aicfg.CA_PATH)
+            aicfg.validate(check)
+        except aicfg.AIError as exc:
+            flash("error", f"Configuration refusée : {exc}")
+            return redirect(url_for("ai_page"))
+        state = Path(app.config["AI_STATE"])
+        request_file = state / "ai-request.json"
+        upd.write_json_atomic(request_file, new, mode=0o600)       # peut contenir le jeton
+        ok, message = app.config["UNIT_STARTER"](AI_UNIT)
+        if not ok:
+            request_file.unlink(missing_ok=True)
+            flash("error", f"Impossible d'appliquer la configuration : {message}")
+        else:
+            flash("success", "Configuration envoyée : application et test de connexion en cours…")
+        return redirect(url_for("ai_page"))
 
     @app.get("/quarantaine")
     @login_required

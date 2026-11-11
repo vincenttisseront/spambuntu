@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Analyse IA · Spambuntu{% endblock %}
+{% block content %}
+<h1>Analyse par intelligence artificielle</h1>
+
+{% if pending %}<div class="banner warning" role="status">Une configuration est en cours d'application…</div>
+{% elif status %}
+<div class="banner {{ 'success' if status.ok else 'error' }}" role="status">
+  Dernière application ({{ status.at }}) : {{ status.message }}
+</div>
+{% endif %}
+
+<section class="card">
+  <p class="muted small">Pour les messages dont le score est ambigu, un serveur Ollama que vous administrez analyse l'intention du
+    message. Avant envoi, adresses, IBAN, cartes, téléphones et chemins d'URL sont remplacés par des marqueurs. L'IA ne peut
+    qu'ajouter du risque (jamais rejeter un message à elle seule). En mode « fantôme », les analyses sont journalisées sans
+    effet sur le courrier : utilisez-le d'abord pour évaluer la qualité.</p>
+</section>
+
+<form method="post" action="{{ url_for('ai_save') }}" class="card form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <h2>Serveur</h2>
+  <label>Mode
+    <select name="mode">
+      {% for value, name in (('off', 'Désactivée'), ('shadow', 'Fantôme (journal seulement)'), ('active', 'Active')) %}
+      <option value="{{ value }}" {% if cfg.mode == value %}selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select></label>
+  <label>Adresse du serveur Ollama (https uniquement)
+    <input name="endpoint" value="{{ cfg.endpoint }}" placeholder="https://ollama.exemple.fr:11434" autocomplete="off"></label>
+  <label>Jeton d'API (laisser vide pour conserver l'actuel{% if token_set %} : un jeton est enregistré{% endif %})
+    <input name="token" type="password" autocomplete="new-password"></label>
+  {% if token_set %}<label class="check"><input type="checkbox" name="clear_token"> Supprimer le jeton enregistré</label>{% endif %}
+  <label>Autorité de certification privée, au format PEM (si le serveur n'a pas un certificat public){% if ca_set %} — une autorité est enregistrée, laisser vide pour la conserver{% endif %}
+    <textarea name="ca_pem" rows="4" spellcheck="false" autocomplete="off"></textarea></label>
+  <input type="hidden" name="ca_file" value="{{ cfg.ca_file }}">
+
+  <h2>Modèles</h2>
+  <div class="grid">
+    <label>Modèle rapide<input name="model_fast" value="{{ cfg.model_fast }}" autocomplete="off"></label>
+    <label>Modèle approfondi (facultatif)<input name="model_deep" value="{{ cfg.model_deep }}" autocomplete="off"></label>
+  </div>
+  <p class="muted small">Le modèle approfondi n'est consulté que si le modèle rapide soupçonne le message ou doute.</p>
+
+  <h2>Limites</h2>
+  <div class="grid">
+    <label>Score minimal d'analyse<input name="ambiguous_min" type="number" step="0.5" value="{{ cfg.ambiguous_min }}"></label>
+    <label>Score maximal d'analyse<input name="ambiguous_max" type="number" step="0.5" value="{{ cfg.ambiguous_max }}"></label>
+    <label>Points ajoutables au plus<input name="max_add" type="number" step="0.5" min="0" max="20" value="{{ cfg.max_add }}"></label>
+    <label>Appels par heure<input name="max_calls_per_hour" type="number" min="1" value="{{ cfg.max_calls_per_hour }}"></label>
+    <label>Délai (secondes)<input name="timeout_s" type="number" min="2" max="120" value="{{ cfg.timeout_s }}"></label>
+  </div>
+  <label>Domaines internes (leurs adresses sont entièrement pseudonymisées), un par ligne
+    <textarea name="internal_domains" rows="3" spellcheck="false" autocomplete="off">{{ domains_text }}</textarea></label>
+  <div class="actions"><button type="submit" class="primary">Appliquer et tester</button></div>
+</form>
+{% endblock %}
