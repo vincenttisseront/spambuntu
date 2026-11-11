@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set portal = True %}
+{% block title %}Mes messages retenus · Spambuntu{% endblock %}
+{% block content %}
+<h1>Mes messages retenus</h1>
+{% if flash %}<div class="banner {{ flash.kind }}" role="status">{{ flash.text }}</div>{% endif %}
+{% if error %}
+  <div class="banner error" role="alert">{{ error }}</div>
+{% else %}
+  {% if blocked %}
+  <div class="notice" role="note">
+    {{ icon('alert') }}
+    <span>{{ blocked }} message(s) ont été bloqués par mesure de sécurité. Ils sont examinés par l'administrateur et ne
+      peuvent pas être gérés ici.</span>
+  </div>
+  {% endif %}
+  {% if not messages %}
+    <section class="card empty">Aucun message de courrier indésirable en attente.</section>
+  {% endif %}
+  {% for m in messages %}
+  <section class="card msg risk-ord">
+    <header>
+      <h2>{{ m.subject or '(sans objet)' }}</h2>
+      <span class="pill risk-ord">Courrier indésirable probable</span>
+    </header>
+    <p class="meta">{{ m.from }} · {{ m.arrived | int | timestamp }}</p>
+    <div class="actions">
+      <form method="post" action="{{ url_for('user_action', token=token, action='release') }}">
+        <input type="hidden" name="queue_id" value="{{ m.id }}">
+        <button type="submit" class="primary">Libérer ce message</button>
+      </form>
+      {% if m.single %}
+      <form method="post" action="{{ url_for('user_action', token=token, action='delete') }}">
+        <input type="hidden" name="queue_id" value="{{ m.id }}">
+        <button type="submit" class="danger">Supprimer</button>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+  {% endfor %}
+  <p class="muted small">Ne libérez que les messages que vous attendiez et dont vous reconnaissez l'expéditeur. Ce lien vous est personnel : ne le transmettez pas.</p>
+{% endif %}
+{% endblock %}

@@ -57,26 +57,29 @@ def _unb64(text: str) -> bytes:
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
 
-def make_token(secret: str, queue_id: str, recipient: str, now: float | None = None) -> str:
-    payload = _b64(f"{queue_id}|{recipient}|{int((now or time.time()) + TOKEN_TTL)}".encode())
+def make_token(secret: str, queue_id: str, recipient: str, now: float | None = None, scope: str = "r") -> str:
+    """scope « r » : libérer un message ; « l » : consulter la liste de ses messages (queue_id = « - »)."""
+    payload = _b64(f"{scope}|{queue_id}|{recipient}|{int((now or time.time()) + TOKEN_TTL)}".encode())
     return payload + "." + _b64(hmac.new(_key(secret), payload.encode(), hashlib.sha256).digest()[:16])
 
 
-def verify_token(secret: str, token: str, now: float | None = None) -> tuple:
-    """Retourne (identifiant de file, destinataire) ou lève DigestError."""
+def verify_token(secret: str, token: str, now: float | None = None, scope: str = "r") -> tuple:
+    """Retourne (identifiant de file, destinataire) ou lève DigestError. Le jeton doit être de la portée demandée."""
     try:
         payload, sig = token.split(".")
         good = _b64(hmac.new(_key(secret), payload.encode(), hashlib.sha256).digest()[:16])
         if not hmac.compare_digest(sig, good):
             raise ValueError
-        queue_id, recipient, expires = _unb64(payload).decode().split("|")
+        token_scope, queue_id, recipient, expires = _unb64(payload).decode().split("|")
+        if token_scope != scope:
+            raise ValueError
         if int(expires) < (now or time.time()):
             raise DigestError("Ce lien a expiré")
     except DigestError:
         raise
     except (ValueError, UnicodeError):
         raise DigestError("Lien invalide") from None
-    if not quarantine.QUEUE_ID_RE.fullmatch(queue_id) or not quarantine.RCPT_RE.fullmatch(recipient):
+    if not quarantine.RCPT_RE.fullmatch(recipient) or not (queue_id == "-" if scope == "l" else quarantine.QUEUE_ID_RE.fullmatch(queue_id)):
         raise DigestError("Lien invalide")
     return queue_id, recipient
 
@@ -95,11 +98,16 @@ def reason_of(item: dict) -> str:
     return "Score élevé"
 
 
-def group_by_recipient(items: list, domains: set, sent: dict, now: float) -> dict:
+def releasable(item: dict, cfg: dict) -> bool:
+    """Message gérable par son destinataire : classe « user » et score connu sous le plafond de libération."""
+    return item.get("class") == "user" and item.get("score") is not None and item["score"] <= cfg["digest_release_max_score"]
+
+
+def group_by_recipient(items: list, domains: set, sent: dict, now: float, cfg: dict) -> dict:
     groups: dict = {}
     for item in items:
-        if now - item["arrived"] > WINDOW or item["id"] in sent:
-            continue
+        if now - item["arrived"] > WINDOW or item["id"] in sent or not releasable(item, cfg):
+            continue          # les messages à risque ne sont jamais détaillés aux utilisateurs
         for rcpt in item["recipients"]:
             rcpt = rcpt.lower()
             if rcpt.rsplit("@", 1)[-1] in domains and quarantine.RCPT_RE.fullmatch(rcpt):
@@ -107,7 +115,8 @@ def group_by_recipient(items: list, domains: set, sent: dict, now: float) -> dic
     return groups
 
 
-def compose(rcpt: str, items: list, cfg: dict, secret: str, hostname: str, now: float | None = None) -> email.message.EmailMessage:
+def compose(rcpt: str, items: list, cfg: dict, secret: str, hostname: str, now: float | None = None,
+            blocked: int = 0) -> email.message.EmailMessage:
     now = now or time.time()
     sender = cfg["digest_from"] or f"quarantaine@{cfg['hostname'] or hostname}"
     msg = email.message.EmailMessage()
@@ -125,13 +134,16 @@ def compose(rcpt: str, items: list, cfg: dict, secret: str, hostname: str, now: 
         lines += [f"- {when}  De : {clean(item['sender'] or item['from'], 80)}",
                   f"  Objet : {clean(item['subject'] or '(sans objet)', 90)}",
                   f"  {reason_of(item)}"]
-        score = item.get("score")
-        if cfg["digest_base_url"] and score is not None and score <= cfg["digest_release_max_score"]:
+        if cfg["digest_base_url"]:
             lines.append(f"  Libérer : {cfg['digest_base_url']}/digest/{make_token(secret, item['id'], rcpt, now)}")
         lines.append("")
     if len(items) > MAX_PER_DIGEST:
         lines += [f"… et {len(items) - MAX_PER_DIGEST} autre(s).", ""]
-    lines += ["Les messages jugés trop suspects ne peuvent pas être libérés depuis ce résumé : contactez votre administrateur.",
+    if cfg["digest_base_url"]:
+        lines += [f"Voir et gérer tous mes messages : {cfg['digest_base_url']}/mes-messages/{make_token(secret, '-', rcpt, now, 'l')}", ""]
+    if blocked:
+        lines += [f"{blocked} autre(s) message(s) ont été bloqués par mesure de sécurité : ils sont examinés par l'administrateur.", ""]
+    lines += ["Seuls les messages de courrier indésirable ordinaire peuvent être libérés ici.",
               "Ne transférez pas ce message : les liens vous sont personnels.", "",
               "Message automatique de la passerelle Spambuntu."]
     msg.set_content("\n".join(lines))
@@ -166,10 +178,15 @@ def run_digest(cfg: dict, items: list, secret: str, state_file: Path = STATE_FIL
     except (OSError, ValueError, AttributeError):
         sent = {}
     domains = {d["name"] for d in cfg["domains"]}
-    groups = group_by_recipient(items, domains, sent, now)
+    groups = group_by_recipient(items, domains, sent, now, cfg)
+    blocked: dict = {}
+    for item in items:
+        if not releasable(item, cfg) and now - item["arrived"] <= WINDOW:
+            for r in item["recipients"]:
+                blocked[r.lower()] = blocked.get(r.lower(), 0) + 1
     report = {"recipients": 0, "messages": 0, "failed": 0}
     for rcpt in sorted(groups)[:MAX_RECIPIENTS]:
-        msg = compose(rcpt, groups[rcpt], cfg, secret, hostname, now)
+        msg = compose(rcpt, groups[rcpt], cfg, secret, hostname, now, blocked.get(rcpt, 0))
         if dry_run:
             print(msg.as_string())
             continue

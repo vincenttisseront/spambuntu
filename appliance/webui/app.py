@@ -192,7 +192,7 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
 
     @app.before_request
     def protect_against_csrf():
-        if request.endpoint == "digest_release":
+        if request.endpoint in ("digest_release", "user_action"):
             return          # sans session : protégé par le jeton signé du lien
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             expected = session.get("csrf") or ""
@@ -384,6 +384,50 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
             return digest_page(200, done=True)
         return digest_page(400, error=result.get("error") or "Échec")
 
+    # ------------------------------------------------------------------ espace utilisateur (lien signé du résumé)
+
+    def user_limit() -> float:
+        try:
+            return mailcfg.load_config(Path(app.config["MAIL_CONF"]))["digest_release_max_score"]
+        except mailcfg.MailError:
+            return 0.0
+
+    def user_page(status: int, **ctx):
+        response = app.make_response((render_template("espace_utilisateur.html", **ctx), status))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.get("/mes-messages/<token>")
+    def user_messages(token):
+        try:
+            _, rcpt = digest.verify_token(secret, token, scope="l")
+        except digest.DigestError as exc:
+            return user_page(400, error=str(exc), messages=[], blocked=0, rcpt="", token="")
+        result = app.config["QUARANTINE_RUNNER"](["list", "--recipient", rcpt, "--max-score", str(user_limit())])
+        if not result.get("ok"):
+            return user_page(502, error="Impossible de lire vos messages pour le moment.", messages=[], blocked=0, rcpt=rcpt, token=token)
+        return user_page(200, error=None, messages=result.get("messages", []), blocked=int(result.get("blocked", 0)),
+                         rcpt=rcpt, token=token)
+
+    @app.post("/mes-messages/<token>/<action>")
+    def user_action(token, action):
+        if action not in ("release", "delete"):
+            abort(404)
+        try:
+            _, rcpt = digest.verify_token(secret, token, scope="l")
+        except digest.DigestError as exc:
+            return user_page(400, error=str(exc), messages=[], blocked=0, rcpt="", token="")
+        queue_id = request.form.get("queue_id", "")
+        if not quarantine.QUEUE_ID_RE.fullmatch(queue_id):
+            flash("error", "Identifiant de message invalide")
+            return redirect(url_for("user_messages", token=token))
+        args = [action, queue_id, "--actor", "utilisateur", "--recipient", rcpt]
+        if action == "release":
+            args += ["--max-score", str(user_limit())]
+        result = app.config["QUARANTINE_RUNNER"](args)
+        flash("success" if result.get("ok") else "error", result.get("message") or result.get("error") or "Échec")
+        return redirect(url_for("user_messages", token=token))
+
     @app.get("/ia")
     @login_required
     def ai_page():
@@ -423,10 +467,19 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
     @app.get("/quarantaine")
     @login_required
     def quarantine_page():
+        view = request.args.get("vue", "risque")
+        if view not in ("risque", "ordinaire", "tout"):
+            view = "risque"
         result = app.config["QUARANTINE_RUNNER"](["list"])
         if not result.get("ok"):
-            return render_template("quarantaine.html", active="quarantine", messages=[], error=result.get("error"))
-        return render_template("quarantaine.html", active="quarantine", messages=result.get("messages", []), error=None)
+            return render_template("quarantaine.html", active="quarantine", messages=[], error=result.get("error"),
+                                   view=view, counts={"admin": 0, "user": 0})
+        everything = result.get("messages", [])
+        counts = {"admin": sum(1 for m in everything if m.get("class") != "user"),
+                  "user": sum(1 for m in everything if m.get("class") == "user")}
+        shown = [m for m in everything if view == "tout" or (view == "risque") == (m.get("class") != "user")]
+        shown.sort(key=lambda m: (m.get("class") == "user", -int(m.get("arrived", 0))))
+        return render_template("quarantaine.html", active="quarantine", messages=shown, error=None, view=view, counts=counts)
 
     @app.post("/quarantaine/<action>")
     @login_required
@@ -440,6 +493,8 @@ def create_app(conf_path: str | None = None, update_conf: str | None = None) -> 
         args = [action, queue_id, "--actor", session.get("user", "console")]
         if request.form.get("learn") == "1":
             args.append("--learn")
+        if action == "release" and request.form.get("confirm") == "on":
+            args.append("--confirm-danger")
         result = app.config["QUARANTINE_RUNNER"](args)
         flash("success" if result.get("ok") else "error", result.get("message") or result.get("error") or "Échec")
         return redirect(url_for("quarantine_page"))

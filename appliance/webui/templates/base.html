@@ -1,3 +1,5 @@
+{% from "_icons.html" import icon %}
+{% set titles = {'index': 'Tableau de bord', 'quarantine': 'Quarantaine', 'journal': 'Journal', 'ai': 'Analyse IA', 'mail': 'Messagerie', 'update': 'Mises à jour'} %}
 <!doctype html>
 <html lang="fr">
 <head>
@@ -5,33 +7,64 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}Spambuntu{% endblock %}</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f6feb'/%3E%3Ctext x='16' y='23' font-size='20' font-family='sans-serif' font-weight='700' text-anchor='middle' fill='white'%3ES%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body>
+<body{% if portal and not user %} class="portal"{% endif %}>
 {% if user %}
-  <header class="topbar">
-    <span class="brand">Spambuntu</span>
-    <nav>
-      <a href="{{ url_for('index') }}" {% if active == 'index' %}class="active"{% endif %}>Tableau de bord</a>
-      <a href="{{ url_for('quarantine_page') }}" {% if active == 'quarantine' %}class="active"{% endif %}>Quarantaine</a>
-      <a href="{{ url_for('journal_page') }}" {% if active == 'journal' %}class="active"{% endif %}>Journal</a>
-      <a href="{{ url_for('ai_page') }}" {% if active == 'ai' %}class="active"{% endif %}>IA</a>
-      <a href="{{ url_for('mail_page') }}" {% if active == 'mail' %}class="active"{% endif %}>Messagerie</a>
-      <a href="{{ url_for('update_page') }}" {% if active == 'update' %}class="active"{% endif %}>Mises à jour</a>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      {{ icon('logo') }}
+      <div><span class="name">Spambuntu</span><span class="ver">v{{ version }}</span></div>
+    </div>
+    <nav class="nav" aria-label="Navigation principale">
+      <a href="{{ url_for('index') }}" {% if active == 'index' %}class="active" aria-current="page"{% endif %}>{{ icon('dashboard') }}Tableau de bord</a>
+      <div class="nav-label">Courrier</div>
+      <a href="{{ url_for('quarantine_page') }}" {% if active == 'quarantine' %}class="active" aria-current="page"{% endif %}>{{ icon('inbox') }}Quarantaine</a>
+      <a href="{{ url_for('journal_page') }}" {% if active == 'journal' %}class="active" aria-current="page"{% endif %}>{{ icon('journal') }}Journal</a>
+      <div class="nav-label">Sécurité</div>
+      <a href="{{ url_for('ai_page') }}" {% if active == 'ai' %}class="active" aria-current="page"{% endif %}>{{ icon('ai') }}Analyse IA</a>
+      <div class="nav-label">Opérations</div>
+      <a href="{{ url_for('mail_page') }}" {% if active == 'mail' %}class="active" aria-current="page"{% endif %}>{{ icon('mail') }}Messagerie</a>
+      <a href="{{ url_for('update_page') }}" {% if active == 'update' %}class="active" aria-current="page"{% endif %}>{{ icon('update') }}Mises à jour</a>
     </nav>
-    <span class="spacer"></span>
-    <span class="version">v{{ version }}</span>
-    <form method="post" action="{{ url_for('logout') }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button type="submit" class="linklike">Déconnexion</button>
-    </form>
-  </header>
+    <div class="sidebar-foot">
+      <span class="who" title="{{ user }}">{{ user }}</span>
+      <form method="post" action="{{ url_for('logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="iconbtn" aria-label="Déconnexion" title="Déconnexion">{{ icon('logout') }}</button>
+      </form>
+    </div>
+  </aside>
+  <div class="panel">
+    <div class="navbar">
+      <span class="page-title">{{ titles.get(active, '') }}</span>
+      <button type="button" class="iconbtn" data-theme-toggle aria-label="Changer de thème" title="Clair / sombre">{{ icon('sun') }}</button>
+    </div>
+{% elif portal %}
+<div class="panel">
+  <div class="navbar">
+    <div class="brand">{{ icon('logo') }}<span class="name">Spambuntu</span></div>
+    <span class="page-title who">{{ rcpt }}</span>
+    <button type="button" class="iconbtn" data-theme-toggle aria-label="Changer de thème" title="Clair / sombre">{{ icon('sun') }}</button>
+  </div>
+{% else %}
+<div class="plain">
 {% endif %}
-  <main>
-    {% if flash %}<div class="banner {{ flash.kind }}" role="status">{{ flash.text }}</div>{% endif %}
-    {% block content %}{% endblock %}
-  </main>
-  {% block scripts %}{% endblock %}
+    <main class="{{ 'page' if (user or portal) else 'plain-main' }}">
+      {% if flash %}<div class="banner {{ flash.kind }}" role="status">{{ flash.text }}</div>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+{% if user %}
+  </div>
+</div>
+{% elif portal %}
+</div>
+{% else %}
+</div>
+{% endif %}
+{% block scripts %}{% endblock %}
 </body>
 </html>

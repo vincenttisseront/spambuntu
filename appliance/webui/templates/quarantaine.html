@@ -1,33 +1,59 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Quarantaine · Spambuntu{% endblock %}
 {% block content %}
 <h1>Quarantaine</h1>
 {% if error %}<div class="banner error" role="alert">{{ error }}</div>{% endif %}
-{% if not messages and not error %}
-<section class="card"><p class="muted">Aucun message en quarantaine.</p></section>
+
+<div class="tiles">
+  <div class="tile risk-high"><span class="tile-icon">{{ icon('alert') }}</span><div><strong>{{ counts.admin }}</strong><span class="label">à examiner (risque)</span></div></div>
+  <div class="tile risk-ord"><span class="tile-icon">{{ icon('inbox') }}</span><div><strong>{{ counts.user }}</strong><span class="label">courrier indésirable ordinaire</span></div></div>
+</div>
+<nav class="segmented" aria-label="Filtrer">
+  <a href="{{ url_for('quarantine_page', vue='risque') }}" {% if view == 'risque' %}class="active" aria-current="page"{% endif %}>À examiner<span class="count">{{ counts.admin }}</span></a>
+  <a href="{{ url_for('quarantine_page', vue='ordinaire') }}" {% if view == 'ordinaire' %}class="active" aria-current="page"{% endif %}>Ordinaire<span class="count">{{ counts.user }}</span></a>
+  <a href="{{ url_for('quarantine_page', vue='tout') }}" {% if view == 'tout' %}class="active" aria-current="page"{% endif %}>Tout</a>
+</nav>
+{% if view != 'ordinaire' %}
+<p class="muted small">Les messages à risque (programme malveillant, hameçonnage, fraude, usurpation, score très élevé) ne sont
+  visibles et gérables que par un administrateur ; leurs destinataires n'en voient pas le contenu.</p>
 {% endif %}
+
+{% if not messages and not error %}<section class="card empty">Aucun message dans cette vue.</section>{% endif %}
 {% for m in messages %}
-<section class="card msg">
-  <h2>{{ m.subject or '(sans objet)' }}</h2>
-  <dl class="facts">
-    <dt>De</dt><dd>{{ m.sender }}</dd>
-    <dt>À</dt><dd>{{ m.recipients | join(', ') }}</dd>
-    <dt>Reçu</dt><dd>{{ m.arrived | int | timestamp }}</dd>
-    <dt>Taille</dt><dd>{{ (m.size / 1024) | round(1) }} Ko</dd>
-    <dt>Score</dt><dd>{{ m.score if m.score is not none else '?' }}</dd>
-    {% if m.ai %}<dt>Analyse IA</dt><dd>{{ m.ai }}{% if m.ai_flags %} <span class="muted">({{ m.ai_flags | join(', ') }})</span>{% endif %}</dd>{% endif %}
-    {% if m.symbols %}<dt>Règles</dt><dd>{{ m.symbols | join(', ') }}</dd>{% endif %}
-  </dl>
+{% set risky = m.get('class') != 'user' %}
+<section class="card msg {{ 'risk-high' if risky else 'risk-ord' }}">
+  <header>
+    <h2>{{ m.subject or '(sans objet)' }}</h2>
+    {% if risky %}<span class="pill risk-high">À examiner</span>{% else %}<span class="pill risk-ord">Courrier indésirable</span>{% endif %}
+  </header>
+  <p class="meta">{{ m.from or m.sender }} → {{ m.recipients | join(', ') }} · {{ m.arrived | int | timestamp }} · {{ (m.size / 1024) | round(1) }} Ko</p>
+  {% if risky and m.danger %}<div class="chips">{% for d in m.danger %}<span class="pill risk-high">{{ d }}</span>{% endfor %}</div>{% endif %}
+  {% if m.ai %}<p><strong>Analyse IA :</strong> {{ m.ai }}</p>{% endif %}
+  <details {% if risky %}open{% endif %}>
+    <summary>Détails techniques</summary>
+    <dl class="facts">
+      <dt>Expéditeur (enveloppe)</dt><dd>{{ m.sender }}</dd>
+      <dt>Score</dt><dd>{{ m.score if m.score is not none else '?' }}</dd>
+      {% if m.symbols %}<dt>Règles</dt><dd>{{ m.symbols | join(', ') }}</dd>{% endif %}
+      <dt>Identifiant</dt><dd>{{ m.id }}</dd>
+    </dl>
+  </details>
   <div class="actions">
-    <form method="post" action="{{ url_for('quarantine_action', action='release') }}">
+    <form method="post" action="{{ url_for('quarantine_action', action='release') }}" class="release">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="queue_id" value="{{ m.id }}">
-      <button type="submit" name="learn" value="1" class="primary" title="Libère le message et apprend qu'il est légitime">Légitime : libérer</button>
-      <button type="submit" name="learn" value="0" title="Libère sans modifier l'apprentissage">Libérer seulement</button>
+      {% if risky %}
+        <label class="confirm"><input type="checkbox" name="confirm" required> J'ai analysé ce message et confirme qu'il est sans danger</label>
+        <button type="submit" name="learn" value="0" class="release-danger">Libérer après analyse</button>
+      {% else %}
+        <button type="submit" name="learn" value="1" class="primary" title="Libère le message et apprend qu'il est légitime">Légitime : libérer</button>
+        <button type="submit" name="learn" value="0" title="Libère sans modifier l'apprentissage">Libérer seulement</button>
+      {% endif %}
     </form>
     <form method="post" action="{{ url_for('quarantine_action', action='delete') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="queue_id" value="{{ m.id }}">
-      <button type="submit" name="learn" value="1" class="danger" title="Supprime le message et apprend que c'est du spam">Spam : supprimer</button>
-      <button type="submit" name="learn" value="0" class="danger" title="Supprime sans modifier l'apprentissage">Supprimer seulement</button>
+      <button type="submit" name="learn" value="1" class="danger" title="Supprime le message et apprend que c'est du spam">{{ 'Confirmer le danger : supprimer' if risky else 'Spam : supprimer' }}</button>
+      {% if not risky %}<button type="submit" name="learn" value="0" class="danger" title="Supprime sans modifier l'apprentissage">Supprimer seulement</button>{% endif %}
     </form>
   </div>
 </section>

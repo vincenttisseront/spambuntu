@@ -19,6 +19,19 @@ console web de l'appliance au moment de proposer la mise à jour.
 - Résumé quotidien de quarantaine (désactivé par défaut) : un courrier par destinataire des domaines déclarés,
   avec, si l'adresse de la console est renseignée, des liens de libération personnels signés (3 jours, confirmation
   obligatoire, limités aux messages peu suspects).
+- Quarantaine par niveau de risque : les messages dangereux (logiciel malveillant, hameçonnage, fraude au
+  président ou à la facture, usurpation, demande d'identifiants ou de paiement, tentative d'injection,
+  pièce jointe douteuse, score très élevé ou message non évalué) sont réservés à l'administrateur ;
+  seul le courrier indésirable ordinaire peut être géré par son destinataire.
+- Espace « Mes messages retenus » (lien personnel signé du résumé) : le destinataire libère ou supprime
+  ses seuls messages ordinaires ; il voit le nombre de messages bloqués sans pouvoir les consulter ;
+  aucun entraînement du filtre depuis cet espace.
+- Libérer un message dangereux demande à l'administrateur une confirmation explicite après analyse.
+
+### Modifié
+- Nouvelle identité visuelle de la console : barre latérale par rubriques, icônes, thème clair/sombre
+  (mémorisé), polices servies par l'appliance (aucune ressource externe), vue utilisateur épurée.
+  Code couleur : rouge = réservé à l'administrateur, bleu = courrier ordinaire gérable, orange = attention.
 
 ## [0.2.0] - 2026-11-11
 

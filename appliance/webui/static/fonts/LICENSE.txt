@@ -1,0 +1,4 @@
+Fira Sans et Fira Code (sous-ensemble latin, via le paquet @fontsource) : SIL Open Font License 1.1.
+Copyright The Mozilla Foundation, Carrois Apps GmbH, Edenspiekermann AG (Fira Sans) ;
+Copyright The Fira Code Project Authors (Fira Code).
+Texte de la licence : https://openfontlicense.org/open-font-license-official-text/

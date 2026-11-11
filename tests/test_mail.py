@@ -449,7 +449,7 @@ def test_listing_exposes_ai_explanation_apart_from_symbols():
 
 def test_release_with_learning_feeds_ham_and_records_feedback(tmp_path):
     fed = []
-    quar.act("release", "AAAAAAAAAA1", "admin", AIQueueRun(), tmp_path / "q.log", do_learn=True,
+    quar.act("release", "AAAAAAAAAA1", "admin", AIQueueRun(), tmp_path / "q.log", do_learn=True, confirm_danger=True,
              feedback_file=tmp_path / "fb.jsonl", feed=lambda label, msg: fed.append((label, msg)) or True)
     assert fed[0][0] == "ham" and b"Virement urgent" in fed[0][1] and b"corps du message" in fed[0][1]
     entry = json.loads((tmp_path / "fb.jsonl").read_text())
@@ -465,29 +465,104 @@ def test_delete_with_learning_feeds_spam(tmp_path):
 
 def test_learning_failure_does_not_block_release(tmp_path):
     run = AIQueueRun()
-    quar.act("release", "AAAAAAAAAA1", "admin", run, tmp_path / "q.log", do_learn=True,
+    quar.act("release", "AAAAAAAAAA1", "admin", run, tmp_path / "q.log", do_learn=True, confirm_danger=True,
              feedback_file=tmp_path / "fb.jsonl", feed=lambda *a: False)
     assert ["postsuper", "-H", "AAAAAAAAAA1"] in run.calls
     assert json.loads((tmp_path / "fb.jsonl").read_text())["learned"] is False
 
 
 def test_restricted_release_checks_recipient_and_score(tmp_path):
-    run = AIQueueRun()
+    run = QueueRun()                                      # score 9.4, aucun signal de danger : classe « user »
     with pytest.raises(quar.QuarantineError, match="destiné"):
         quar.act("release", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", recipient="autre@exemple.fr")
     with pytest.raises(quar.QuarantineError, match="trop suspect"):
-        quar.act("release", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", recipient="moi@exemple.fr", max_score=10)
+        quar.act("release", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", recipient="moi@exemple.fr", max_score=5)
     assert not any(c[0] == "postsuper" for c in run.calls)
     quar.act("release", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", recipient="MOI@exemple.fr", max_score=20)
     assert ["postsuper", "-H", "AAAAAAAAAA1"] in run.calls
     assert "(MOI@exemple.fr)" in (tmp_path / "q.log").read_text()
 
 
-def test_restricted_release_refuses_unscored_message(tmp_path):
-    run = QueueRun()                       # en-têtes sans X-Spamd-Result exploitable
-    run.__class__ = type("NoScore", (QueueRun,), {"__call__": lambda self, cmd: subprocess.CompletedProcess(cmd, 0, b"Subject: x\n", b"") if cmd[0] == "postcat" else QueueRun.__call__(self, cmd)})
-    with pytest.raises(quar.QuarantineError, match="trop suspect"):
-        quar.act("release", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", max_score=20)
+def no_score_run():
+    class NoScore(QueueRun):
+        def __call__(self, cmd):
+            if cmd[0] == "postcat":
+                return subprocess.CompletedProcess(cmd, 0, b"Subject: x\n", b"")
+            return super().__call__(cmd)
+    return NoScore()
+
+
+def test_unscored_message_is_admin_class_and_refused_to_users(tmp_path):
+    with pytest.raises(quar.QuarantineError, match="administrateur"):
+        quar.act("release", "AAAAAAAAAA1", "digest", no_score_run(), tmp_path / "q.log", recipient="moi@exemple.fr", max_score=20)
+
+
+# ----------------------------------------------------------------------------- classes « user » / « admin »
+
+def test_classification():
+    assert quar.classify(["QTEST", "MIME_GOOD"], [], 9.4) == ("user", [])
+    assert quar.classify([], ["bec", "payment"], 6.0)[0] == "admin"
+    assert quar.classify(["CLAM_VIRUS"], [], 6.0) == ("admin", ["Programme malveillant"])
+    assert quar.classify(["PHISHED_OPENPHISH"], [], 6.0)[1] == ["Hameçonnage"]
+    assert quar.classify(["MIME_BAD_EXTENSION"], [], 6.0)[1] == ["Pièce jointe dangereuse"]
+    assert quar.classify(["DMARC_POLICY_REJECT"], [], 6.0)[1] == ["Usurpation de domaine"]
+    assert quar.classify([], ["spam"], 9.0)[0] == "user" and quar.classify([], ["other"], 9.0)[0] == "user"
+    assert quar.classify([], [], 12.0)[1] == ["Score très élevé"] and quar.classify([], [], None)[1] == ["Analyse impossible"]
+    assert quar.classify([], ["phishing", "phishing"], 1.0)[1] == ["Hameçonnage"]            # sans doublon
+
+
+def test_listing_marks_classes_and_reasons():
+    assert quar.listing(QueueRun())[0]["class"] == "user"
+    dangerous = quar.listing(AIQueueRun())[0]
+    assert dangerous["class"] == "admin" and "Fraude au président ou à la facture" in dangerous["danger"]
+
+
+def test_user_listing_hides_dangerous_messages_and_details():
+    class Mixed(QueueRun):
+        def __call__(self, cmd):
+            if cmd[0] == "postcat" and cmd[1] == "-qh":
+                return subprocess.CompletedProcess(cmd, 0, HEAD_AI if cmd[2] == "BBBBBBBBBB2" else HEAD, b"")
+            return super().__call__(cmd)
+    view = quar.listing_for_user("MOI@exemple.fr", Mixed())
+    assert [m["id"] for m in view["messages"]] == ["AAAAAAAAAA1"] and view["blocked"] == 1
+    assert set(view["messages"][0]) == {"id", "from", "subject", "arrived", "size", "single"}      # ni score ni règles
+    assert quar.listing_for_user("autre@exemple.fr", Mixed()) == {"messages": [], "blocked": 0}
+    with pytest.raises(quar.QuarantineError):
+        quar.listing_for_user("pas une adresse", Mixed())
+
+
+def test_users_cannot_release_or_delete_dangerous_messages(tmp_path):
+    run = AIQueueRun()
+    for action in ("release", "delete"):
+        with pytest.raises(quar.QuarantineError, match="administrateur"):
+            quar.act(action, "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", recipient="moi@exemple.fr")
+    assert not any(c[0] == "postsuper" for c in run.calls)
+
+
+def test_admin_must_confirm_release_of_dangerous_message(tmp_path):
+    run = AIQueueRun()
+    with pytest.raises(quar.QuarantineError, match="confirmez"):
+        quar.act("release", "AAAAAAAAAA1", "admin", run, tmp_path / "q.log")
+    assert not any(c[0] == "postsuper" for c in run.calls)
+    quar.act("release", "AAAAAAAAAA1", "admin", run, tmp_path / "q.log", confirm_danger=True)
+    assert ["postsuper", "-H", "AAAAAAAAAA1"] in run.calls
+    quar.act("delete", "BBBBBBBBBB2", "admin", AIQueueRun(), tmp_path / "q.log")                # supprimer ne demande rien
+
+
+def test_user_delete_refused_for_multi_recipient_messages(tmp_path):
+    run = QueueRun()
+    for e in run.entries:
+        e["recipients"] = [{"address": "moi@exemple.fr"}, {"address": "autre@exemple.fr"}]
+    with pytest.raises(quar.QuarantineError, match="plusieurs"):
+        quar.act("delete", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", recipient="moi@exemple.fr")
+    quar.act("release", "AAAAAAAAAA1", "digest", run, tmp_path / "q.log", recipient="moi@exemple.fr")
+
+
+def test_user_actions_never_train_the_filter(tmp_path):
+    fed = []
+    quar.act("release", "AAAAAAAAAA1", "digest", QueueRun(), tmp_path / "q.log", recipient="moi@exemple.fr", do_learn=True,
+             feedback_file=tmp_path / "fb.jsonl", feed=lambda *a: fed.append(a) or True)
+    assert fed == [] and not (tmp_path / "fb.jsonl").exists()
 
 
 def test_bad_recipient_is_refused(tmp_path):

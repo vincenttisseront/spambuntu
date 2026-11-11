@@ -21,7 +21,7 @@ def cfg(**kw):
 
 def item(i="AAAAAAAAAA1", rcpts=("moi@exemple.fr",), score=9.0, arrived=NOW - 3600, **kw):
     d = {"id": i, "sender": "pub@x.test", "recipients": list(rcpts), "size": 100, "arrived": arrived, "subject": "Offre",
-         "from": "Pub <pub@x.test>", "score": score, "symbols": ["QTEST"], "ai": "", "ai_flags": []}
+         "from": "Pub <pub@x.test>", "score": score, "symbols": ["QTEST"], "ai": "", "ai_flags": [], "class": "user", "danger": []}
     d.update(kw)
     return d
 
@@ -64,7 +64,7 @@ def test_each_recipient_gets_only_their_messages(tmp_path):
 
 def test_links_only_for_releasable_scores(tmp_path):
     sent = []
-    items = [item("AAAAAAAAAA1", score=5.0), item("BBBBBBBBBB2", score=14.0, subject="Fraude")]
+    items = [item("AAAAAAAAAA1", score=5.0), item("BBBBBBBBBB2", score=11.0, subject="Fraude")]
     dg.run_digest(cfg(), items, SECRET, sender=lambda m: sent.append(m) or True, now=NOW, state_file=tmp_path / "s.json")
     text = sent[0].get_content()
     assert text.count("https://gw.exemple.fr:8443/digest/") == 1
@@ -169,3 +169,99 @@ def test_release_by_link_reports_errors_and_rejects_forgery(digestweb):
 
 def test_other_posts_still_need_csrf(web):
     assert web.client.post("/logout").status_code == 403
+
+
+# ----------------------------------------------------------------------------- espace utilisateur et vue administrateur
+
+@pytest.fixture
+def portal(mailweb):
+    mailweb.calls = []
+
+    def runner(args):
+        mailweb.calls.append(args)
+        if args[0] == "list" and "--recipient" in args:
+            return {"ok": True, "blocked": 2, "messages": [
+                {"id": "AAAAAAAAAA1", "from": "<b>Pub</b> <pub@x.test>", "subject": "<img src=x onerror=alert(1)>",
+                 "arrived": 1700000000, "size": 100, "single": True},
+                {"id": "BBBBBBBBBB2", "from": "Autre <a@x.test>", "subject": "Promo", "arrived": 1700000100, "size": 100, "single": False}]}
+        if args[0] == "list":
+            return {"ok": True, "messages": [
+                {"id": "AAAAAAAAAA1", "class": "user", "danger": [], "sender": "pub@x.test", "from": "Pub", "recipients": ["moi@exemple.fr"],
+                 "size": 2048, "arrived": 1700000000, "subject": "Promo", "score": 6.0, "symbols": ["QTEST"], "ai": "", "ai_flags": []},
+                {"id": "CCCCCCCCCC3", "class": "admin", "danger": ["Hameçonnage", "Demande de paiement"], "sender": "pdg@evil.test", "from": "PDG",
+                 "recipients": ["moi@exemple.fr"], "size": 1024, "arrived": 1700000500, "subject": "Virement urgent", "score": 14.0,
+                 "symbols": ["PHISHED"], "ai": "Fraude au président probable", "ai_flags": ["bec"]}]}
+        return {"ok": True, "message": "Message libéré et remis en livraison"}
+
+    mailweb.app.config["QUARANTINE_RUNNER"] = runner
+    mailweb.token = lambda scope="l", qid="-": dg.make_token(mailweb.app.config["SECRET_KEY"], qid, "moi@exemple.fr", scope=scope)
+    return mailweb
+
+
+def test_user_space_lists_messages_escaped_without_technical_details(portal):
+    client = portal.app.test_client()
+    page = client.get(f"/mes-messages/{portal.token()}")
+    html = page.get_data(as_text=True)
+    assert page.status_code == 200 and "moi@exemple.fr" in html and "2 message(s) ont été bloqués" in html
+    assert "<img src=x" not in html and "&lt;img src=x" in html
+    assert "score" not in html.lower() and "Hameçonnage" not in html
+    assert html.count("Libérer ce message") == 2 and html.count(">Supprimer<") == 1       # pas de suppression si plusieurs destinataires
+    assert portal.calls[0][:3] == ["list", "--recipient", "moi@exemple.fr"] and "--max-score" in portal.calls[0]
+    assert "no-store" in page.headers["Cache-Control"]
+
+
+def test_user_space_needs_a_valid_list_token(portal):
+    client = portal.app.test_client()
+    release_token = portal.token("r", "AAAAAAAAAA1")
+    assert client.get(f"/mes-messages/{release_token}").status_code == 400          # un jeton de libération n'ouvre pas la liste
+    assert client.get("/mes-messages/forge").status_code == 400
+    assert client.post(f"/mes-messages/{release_token}/release", data={"queue_id": "AAAAAAAAAA1"}).status_code == 400
+    assert not [c for c in portal.calls if c[0] in ("release", "delete")]
+    assert client.get(f"/digest/{portal.token()}").status_code == 400                # et réciproquement
+
+
+def test_user_actions_are_scoped_to_the_token_recipient(portal):
+    client = portal.app.test_client()
+    token = portal.token()
+    res = client.post(f"/mes-messages/{token}/release", data={"queue_id": "AAAAAAAAAA1"})
+    assert res.status_code == 302
+    assert portal.calls[-1][:6] == ["release", "AAAAAAAAAA1", "--actor", "utilisateur", "--recipient", "moi@exemple.fr"]
+    assert "--max-score" in portal.calls[-1] and "--confirm-danger" not in portal.calls[-1]
+    client.post(f"/mes-messages/{token}/delete", data={"queue_id": "AAAAAAAAAA1"})
+    assert portal.calls[-1][:6] == ["delete", "AAAAAAAAAA1", "--actor", "utilisateur", "--recipient", "moi@exemple.fr"]
+    assert client.post(f"/mes-messages/{token}/format", data={"queue_id": "AAAAAAAAAA1"}).status_code == 404
+    before = len(portal.calls)
+    client.post(f"/mes-messages/{token}/release", data={"queue_id": "x;y --confirm-danger"})
+    assert len(portal.calls) == before
+
+
+def test_admin_view_separates_risk_from_ordinary(portal):
+    risk = portal.client.get("/quarantaine").get_data(as_text=True)
+    assert "Virement urgent" in risk and "Hameçonnage" in risk and "Promo" not in risk
+    assert "Libérer après analyse" in risk and 'name="confirm" required' in risk and "Légitime : libérer" not in risk
+    ordinary = portal.client.get("/quarantaine?vue=ordinaire").get_data(as_text=True)
+    assert "Promo" in ordinary and "Virement urgent" not in ordinary and "Légitime : libérer" in ordinary
+    everything = portal.client.get("/quarantaine?vue=tout").get_data(as_text=True)
+    assert everything.index("Virement urgent") < everything.index("Promo")                 # le risque d'abord
+    assert "Virement urgent" in portal.client.get("/quarantaine?vue=nimportequoi").get_data(as_text=True)       # vue inconnue : repli sur « à examiner »
+
+
+def test_admin_release_of_risky_message_forwards_confirmation(portal):
+    token = csrf(portal.client, "/quarantaine")
+    portal.client.post("/quarantaine/release", data={"queue_id": "CCCCCCCCCC3", "learn": "0", "csrf_token": token})
+    assert "--confirm-danger" not in portal.calls[-1]
+    portal.client.post("/quarantaine/release", data={"queue_id": "CCCCCCCCCC3", "learn": "0", "confirm": "on", "csrf_token": token})
+    assert "--confirm-danger" in portal.calls[-1]
+
+
+def test_digest_never_details_risky_messages(tmp_path):
+    sent = []
+    risky = item("CCCCCCCCCC3", subject="Virement urgent", **{"class": "admin", "danger": ["Hameçonnage"]})
+    dg.run_digest(cfg(), [item("AAAAAAAAAA1"), risky], SECRET, sender=lambda m: sent.append(m) or True, now=NOW, state_file=tmp_path / "s.json")
+    text = sent[0].get_content()
+    assert "Virement urgent" not in text and "1 autre(s) message(s) ont été bloqués" in text and "/mes-messages/" in text
+    link = text.split("/mes-messages/")[1].split()[0]
+    assert dg.verify_token(SECRET, link, NOW, scope="l") == ("-", "moi@exemple.fr")
+    only_risky = []
+    dg.run_digest(cfg(), [risky], SECRET, sender=lambda m: only_risky.append(m) or True, now=NOW, state_file=tmp_path / "s2.json")
+    assert only_risky == []                                                         # rien à gérer : pas de résumé

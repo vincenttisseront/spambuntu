@@ -1,32 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Tableau de bord · Spambuntu
-<section class="card">
-  <h2>Courrier des dernières 24 h</h2>
-  {% if not stats %}
-    <p class="muted">Statistiques indisponibles pour le moment.</p>
-  {% elif not stats.total %}
-    <p class="muted">Aucun message analysé sur la période.</p>
-  {% else %}
-    <div class="tiles">
-      <div class="tile"><strong>{{ stats.total }}</strong><span>analysés</span></div>
-      <div class="tile cat-delivered"><strong>{{ stats.counts.delivered }}</strong><span>livrés</span></div>
-      <div class="tile cat-tagged"><strong>{{ stats.counts.tagged }}</strong><span>marqués</span></div>
-      <div class="tile cat-quarantined"><strong>{{ stats.counts.quarantined }}</strong><span>en quarantaine</span></div>
-      <div class="tile cat-rejected"><strong>{{ stats.counts.rejected }}</strong><span>rejetés</span></div>
-    </div>
-    <svg class="chart" viewBox="0 0 720 140" role="img" aria-label="Messages par heure">
-      {% for b in bars %}<rect class="bar cat-{{ b.cat }}" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}"><title>{{ b.tip }}</title></rect>{% endfor %}
-    </svg>
-    <div class="tops">
-      <div><h3>Domaines expéditeurs</h3>
-        {% for t in stats.top_sender_domains %}<p><a href="{{ url_for('journal_page', q=t.name) }}">{{ t.name }}</a> <span class="muted">{{ t.count }}</span></p>{% else %}<p class="muted">—</p>{% endfor %}</div>
-      <div><h3>Règles déclenchées</h3>
-        {% for t in stats.top_symbols %}<p>{{ t.name }} <span class="muted">{{ t.count }}</span></p>{% else %}<p class="muted">—</p>{% endfor %}</div>
-    </div>
-    <p><a href="{{ url_for('journal_page') }}">Rechercher dans le journal</a></p>
-  {% endif %}
-</section>
-{% endblock %}
+{% from "_icons.html" import icon %}
+{% block title %}Tableau de bord · Spambuntu{% endblock %}
 {% block content %}
 <h1>Tableau de bord</h1>
 
@@ -37,10 +11,51 @@
   </p>
 {% endif %}
 
+{% if stats and stats.total %}
+<div class="tiles">
+  <div class="tile"><span class="tile-icon">{{ icon('layers') }}</span><div><strong>{{ stats.total }}</strong><span class="label">analysés (24 h)</span></div></div>
+  <div class="tile cat-delivered"><span class="tile-icon">{{ icon('check') }}</span><div><strong>{{ stats.counts.delivered }}</strong><span class="label">livrés</span></div></div>
+  <div class="tile cat-tagged"><span class="tile-icon">{{ icon('tag') }}</span><div><strong>{{ stats.counts.tagged }}</strong><span class="label">marqués</span></div></div>
+  <div class="tile cat-quarantined"><span class="tile-icon">{{ icon('inbox') }}</span><div><strong>{{ stats.counts.quarantined }}</strong><span class="label">en quarantaine</span></div></div>
+  <div class="tile cat-rejected"><span class="tile-icon">{{ icon('ban') }}</span><div><strong>{{ stats.counts.rejected }}</strong><span class="label">rejetés</span></div></div>
+</div>
+
+<section class="card">
+  <h2>Messages par heure</h2>
+  <svg class="chart" viewBox="0 0 720 140" preserveAspectRatio="none" role="img" aria-label="Messages par heure">
+    {% for b in bars %}<rect class="bar cat-{{ b.cat }}" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}"><title>{{ b.tip }}</title></rect>{% endfor %}
+  </svg>
+  <div class="legend">
+    <span class="key cat-delivered">livrés</span><span class="key cat-tagged">marqués</span><span class="key cat-deferred">différés</span>
+    <span class="key cat-quarantined">quarantaine</span><span class="key cat-rejected">rejetés</span>
+  </div>
+</section>
+
+<div class="cols">
+  <section class="card">
+    <h2>Domaines expéditeurs suspects</h2>
+    {% for t in stats.top_sender_domains %}<p class="row"><a href="{{ url_for('journal_page', q=t.name) }}" class="mono">{{ t.name }}</a><span class="muted num">{{ t.count }}</span></p>{% else %}<p class="muted">—</p>{% endfor %}
+    <p class="small"><a href="{{ url_for('journal_page') }}">Rechercher dans le journal</a></p>
+  </section>
+  <section class="card">
+    <h2>Règles déclenchées</h2>
+    {% for t in stats.top_symbols %}<p class="row"><span class="mono">{{ t.name }}</span><span class="muted num">{{ t.count }}</span></p>{% else %}<p class="muted">—</p>{% endfor %}
+  </section>
+  <section class="card">
+    <h2>Système</h2>
+    <dl class="facts">
+      <dt>Version</dt><dd>{{ version }}</dd>
+    </dl>
+  </section>
+</div>
+{% else %}
+<section class="card">
+  <h2>Courrier des dernières 24 h</h2>
+  <p class="muted">{{ 'Aucun message analysé sur la période.' if stats else 'Statistiques indisponibles pour le moment.' }}</p>
+</section>
 <section class="card">
   <h2>Système</h2>
-  <dl class="facts">
-    <dt>Version installée</dt><dd>{{ version }}</dd>
-  </dl>
+  <dl class="facts"><dt>Version</dt><dd>{{ version }}</dd></dl>
 </section>
+{% endif %}
 {% endblock %}
