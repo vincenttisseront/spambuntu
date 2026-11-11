@@ -3,10 +3,15 @@
 Le contenu de la section d'une version est publié comme notes de release et affiché dans la
 console web de l'appliance au moment de proposer la mise à jour.
 
-## Non publié
+## [0.3.0] - 2026-11-11
 
+### Ajouté
 - Tableau de bord : compteurs et histogramme des dernières 24 h, domaines et règles les plus fréquents.
-- Page « Journal » : recherche de messages (expéditeur, destinataire, IP, identifiant) dans le journal de Rspamd, métadonnées uniquement.
+- Page « Journal » : recherche de messages (expéditeur, destinataire, IP, identifiant), métadonnées uniquement.
+- Analyse IA des messages ambigus par un serveur Ollama distant (désactivée par défaut, mode « fantôme »
+  disponible) : anonymisation avant envoi, contenu isolé contre l'injection de prompt, réponse JSON stricte,
+  l'IA ne peut qu'ajouter du risque et jamais, seule, faire rejeter un message, budget horaire,
+  disjoncteur, journal d'audit des envois, cascade petit/gros modèle.
 
 ## [0.2.0] - 2026-11-11
 

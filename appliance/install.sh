@@ -74,6 +74,9 @@ create_user() {
     [ -z "$D" ] || return 0
     id spambuntu >/dev/null 2>&1 ||
         useradd --system --home-dir /var/lib/spambuntu --no-create-home --shell /usr/sbin/nologin spambuntu
+    # Service d'analyse IA : compte distinct, seul à pouvoir lire le jeton du serveur LLM.
+    id spambuntu-ai >/dev/null 2>&1 ||
+        useradd --system --home-dir /var/lib/spambuntu/ai --no-create-home --shell /usr/sbin/nologin spambuntu-ai
 }
 
 setup_dirs() {
@@ -87,6 +90,8 @@ setup_dirs() {
     mkd 0755 root:root "$VAR/mail"
     mkd 0755 spambuntu:spambuntu "$VAR/mail/user"       # demandes de la console (messagerie)
     mkd 0755 root:root "$LOG"
+    mkd 0750 spambuntu-ai:spambuntu-ai "$VAR/ai"
+    mkd 0750 spambuntu-ai:spambuntu-ai "$LOG/ai"             # journal d'audit des envois au LLM
 }
 
 install_release() {
@@ -122,7 +127,11 @@ EOF
 #!/bin/sh
 exec /usr/bin/python3 -I /opt/spambuntu/current/mail/spambuntu_logs.py "$@"
 EOF
-    chmod 0755 "$SBIN/spambuntu-update" "$SBIN/spambuntu-passwd" "$SBIN/spambuntu-mail" "$SBIN/spambuntu-quarantine" "$SBIN/spambuntu-mailstats"
+    cat > "$SBIN/spambuntu-ai" <<'EOF'
+#!/bin/sh
+exec /usr/bin/python3 -I /opt/spambuntu/current/ai/spambuntu_ai.py "$@"
+EOF
+    chmod 0755 "$SBIN/spambuntu-update" "$SBIN/spambuntu-passwd" "$SBIN/spambuntu-mail" "$SBIN/spambuntu-quarantine" "$SBIN/spambuntu-mailstats" "$SBIN/spambuntu-ai"
 }
 
 install_units() {
@@ -201,14 +210,22 @@ install_mail() {
     "$SBIN/spambuntu-mail" init --no-reload
 }
 
+install_ai() {
+    # Règle Rspamd (fichier géré par Spambuntu) et configuration par défaut : IA désactivée.
+    [ -z "$D" ] || return 0
+    install -D -m 0644 "$SRC/ai/rspamd/spambuntu_ai.lua" /etc/rspamd/local.d/rspamd.lua
+    [ -s "$ETC/ai.json" ] || install -m 0640 -o root -g spambuntu-ai /dev/null "$ETC/ai.json"
+    [ -s "$ETC/ai.json" ] || echo '{"mode": "off"}' > "$ETC/ai.json"
+}
+
 enable_services() {
     have_systemd || [ -z "$D" ] || return 0
     systemctl enable spambuntu-webui.service spambuntu-update-check.timer || true
-    systemctl enable redis-server.service rspamd.service postfix.service || true
+    systemctl enable redis-server.service rspamd.service postfix.service spambuntu-ai.service || true
     if [ "$START" -eq 1 ] && have_systemd; then
         systemctl restart spambuntu-webui.service
         systemctl start spambuntu-update-check.timer
-        systemctl restart redis-server.service rspamd.service postfix.service || true
+        systemctl restart spambuntu-ai.service redis-server.service rspamd.service postfix.service || true
     fi
 }
 
@@ -233,6 +250,7 @@ else
     install_pubkey
     install_motd
     install_mail
+    install_ai
     enable_services
     echo "Spambuntu $VERSION installé. Console : https://<adresse-ip>:8443 (certificat auto-signé)"
 fi

@@ -71,10 +71,10 @@ def test_bundle_is_reproducible(repo_copy, tmp_path):
 
 
 def test_bundle_min_from_version_is_propagated(repo_copy, tmp_path):
-    (repo_copy / "MIN_FROM_VERSION").write_text("0.3.0\n")
+    (repo_copy / "MIN_FROM_VERSION").write_text("0.4.0\n")
     bundle = build(repo_copy, "0.4.2", tmp_path / "out")
     with tarfile.open(bundle) as tar:
-        assert json.load(tar.extractfile("spambuntu-0.4.2/manifest.json"))["min_from_version"] == "0.3.0"
+        assert json.load(tar.extractfile("spambuntu-0.4.2/manifest.json"))["min_from_version"] == "0.4.0"
 
 
 def test_build_refuses_private_key_and_bad_version(repo_copy, tmp_path):
@@ -116,24 +116,24 @@ def test_release_script(repo_copy, tmp_path):
     run(["git", "commit", "-q", "-m", "init"], cwd=repo_copy, env=GIT_ENV)
     release = [str(repo_copy / "tools" / "release.sh")]
 
-    r = run(release + ["0.3.0"], cwd=repo_copy, env=GIT_ENV, check=False)
+    r = run(release + ["0.5.0"], cwd=repo_copy, env=GIT_ENV, check=False)
     assert r.returncode != 0 and "CHANGELOG" in r.stderr           # notes obligatoires
     for bad in ("abc", "0.0.9", "0.2.0"):
         assert run(release + [bad], cwd=repo_copy, env=GIT_ENV, check=False).returncode != 0
 
     changelog = repo_copy / "CHANGELOG.md"
-    changelog.write_text(changelog.read_text() + "\n## [0.3.0] - 2026-12-01\n\n- Nouveauté\n")
+    changelog.write_text(changelog.read_text() + "\n## [0.5.0] - 2026-12-01\n\n- Nouveauté\n")
     run(["git", "commit", "-qam", "notes"], cwd=repo_copy, env=GIT_ENV)
-    run(release + ["0.3.0"], cwd=repo_copy, env=GIT_ENV)
-    assert (repo_copy / "VERSION").read_text().strip() == "0.3.0"
-    assert "v0.3.0" in run(["git", "tag"], cwd=repo_copy).stdout
-    assert run(release + ["0.3.0"], cwd=repo_copy, env=GIT_ENV, check=False).returncode != 0  # tag déjà là
+    run(release + ["0.5.0"], cwd=repo_copy, env=GIT_ENV)
+    assert (repo_copy / "VERSION").read_text().strip() == "0.5.0"
+    assert "v0.5.0" in run(["git", "tag"], cwd=repo_copy).stdout
+    assert run(release + ["0.5.0"], cwd=repo_copy, env=GIT_ENV, check=False).returncode != 0  # tag déjà là
 
     (repo_copy / "appliance" / "etc" / "update-pubkey.pem").unlink()
     run(["git", "commit", "-qam", "sans clé"], cwd=repo_copy, env=GIT_ENV)
-    changelog.write_text(changelog.read_text() + "\n## [0.4.0] - 2026-12-02\n\n- Autre\n")
+    changelog.write_text(changelog.read_text() + "\n## [0.6.0] - 2026-12-02\n\n- Autre\n")
     run(["git", "commit", "-qam", "notes 0.4"], cwd=repo_copy, env=GIT_ENV)
-    r = run(release + ["0.4.0"], cwd=repo_copy, env=GIT_ENV, check=False)
+    r = run(release + ["0.6.0"], cwd=repo_copy, env=GIT_ENV, check=False)
     assert r.returncode != 0 and "clé publique" in r.stderr
 
 
@@ -259,6 +259,8 @@ def test_real_bundle_update_end_to_end(env, repo_copy, monkeypatch):
     assert "0001-messagerie.sh" in (dest / "var/lib/spambuntu/migrations.done").read_text()
     assert (dest / "var/lib/spambuntu/mail/user").is_dir()                                 # créé par install.sh --refresh
     assert (dest / "usr/local/sbin/spambuntu-quarantine").is_file()
+    assert (dest / "usr/local/sbin/spambuntu-ai").is_file()
+    assert (dest / "etc/systemd/system/spambuntu-ai.service").is_file()
     assert (dest / "etc/systemd/system/spambuntu-mail-apply.service").is_file()
     log = env.log.read_text()
     assert "Contrôles préalables réussis" in log and "Rafraîchissement de la version 0.2.0 terminé" in log
@@ -282,7 +284,7 @@ def test_real_bundle_migration_runs_once(env, repo_copy, monkeypatch):
     (repo_copy / "appliance/hooks/migrations/0001-demo.sh").write_text(f'echo run >> "{marker}"\n')
     publish_real(env, repo_copy, "0.2.0")
     assert env.apply() == 0
-    publish_real(env, repo_copy, "0.3.0")
+    publish_real(env, repo_copy, "0.5.0")
     assert env.apply() == 0
     assert marker.read_text().splitlines() == ["run"]
 
