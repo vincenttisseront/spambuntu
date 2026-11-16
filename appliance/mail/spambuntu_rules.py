@@ -45,10 +45,12 @@ SIGNALS = {
         ("exact", "MIME_DOUBLE_BAD_EXTENSION", 60), ("exact", "MIME_BAD_EXTENSION", 40),
         ("exact", "MIME_ARCHIVE_IN_ARCHIVE", 40), ("exact", "MIME_ENCRYPTED_ARCHIVE", 40),
         ("exact", "MIME_OBFUSCATED_ARCHIVE", 40), ("exact", "SPAMBUNTU_AI_MALWARE_LURE", 60),
+        ("exact", "SPAMBUNTU_SANDBOX_MALICIOUS", 100), ("exact", "SPAMBUNTU_SANDBOX_SUSPICIOUS", 60),
     ),
     "phish": (
         ("contains", "PHISH", 100), ("exact", "SPAMBUNTU_AI_PHISHING", 85), ("exact", "SPAMBUNTU_AI_CREDENTIALS", 60),
         ("exact", "SEM_URIBL_FRESH15", 30), ("exact", "HTML_META_REFRESH_URL", 20),
+        ("exact", "SPAMBUNTU_SANDBOX_URL_MALICIOUS", 100), ("exact", "SPAMBUNTU_SANDBOX_URL_SUSPICIOUS", 60),
     ),
     "impostor": (
         ("exact", "SPAMBUNTU_VIP_SPOOF", 100), ("exact", "SPAMBUNTU_LOOKALIKE", 90), ("exact", "SPAMBUNTU_IDN_HOMOGLYPH", 90),

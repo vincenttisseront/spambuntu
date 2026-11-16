@@ -77,6 +77,14 @@ _EXACT = {
     "BAYES_HAM": ("Apprentissage", "Le filtre bayésien reconnaît ce message comme légitime"),
     # IA
     "SPAMBUNTU_AI": ("IA", "Points ajoutés par l'analyse d'intention (IA)"),
+    # Sandbox des pièces jointes
+    "SPAMBUNTU_SANDBOX_MALICIOUS": ("Sandbox", "Pièce jointe jugée malveillante par l'analyse du sandbox"),
+    "SPAMBUNTU_SANDBOX_SUSPICIOUS": ("Sandbox", "Pièce jointe suspecte selon l'analyse du sandbox"),
+    "SPAMBUNTU_SANDBOX_CLEAN": ("Sandbox", "Pièces jointes analysées par le sandbox : rien d'anormal"),
+    "SPAMBUNTU_SANDBOX_ERROR": ("Sandbox", "Le sandbox n'a pas pu analyser ce message"),
+    "SPAMBUNTU_SANDBOX_MONITOR": ("Sandbox", "Verdict du sandbox en mode observation (sans effet sur la livraison)"),
+    "SPAMBUNTU_SANDBOX_URL_MALICIOUS": ("Sandbox", "Lien jugé malveillant par le sandbox"),
+    "SPAMBUNTU_SANDBOX_URL_SUSPICIOUS": ("Sandbox", "Lien suspect selon le sandbox"),
 }
 
 _PATTERNS = (

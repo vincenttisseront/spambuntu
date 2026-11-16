@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "appliance" / "updater"))
 sys.path.insert(0, str(ROOT / "appliance" / "webui"))
 sys.path.insert(0, str(ROOT / "appliance" / "mail"))
 sys.path.insert(0, str(ROOT / "appliance" / "ai"))
+sys.path.insert(0, str(ROOT / "appliance" / "sandbox"))
 
 import spambuntu_update as upd  # noqa: E402
 

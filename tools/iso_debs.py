@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prépare le dépôt apt embarqué de l'ISO : les .deb que le système installé par l'ISO ne contient pas.
 
-  iso_debs.py MANIFEST... --packages packages.txt --out DIR
+  iso_debs.py MANIFEST... --packages packages.txt [packages-sandbox.txt ...] --out DIR
 
 Les MANIFEST sont ceux de l'ISO Ubuntu (casper/*.manifest, format « diff » : lignes +nom<TAB>version).
 Ils servent à simuler l'installation sur un système identique à celui de l'ISO ; seuls les paquets
@@ -55,12 +55,16 @@ def plan(status, packages):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("manifests", nargs="+")
-    ap.add_argument("--packages", required=True)
+    ap.add_argument("--packages", required=True, nargs="+", help="un ou plusieurs fichiers (un jeu par rôle : leur union est embarquée)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
-    packages = [l.strip() for l in Path(args.packages).read_text(encoding="utf-8").splitlines()
-                if l.strip() and not l.lstrip().startswith("#")]
+    packages = []
+    for listing in args.packages:
+        for line in Path(listing).read_text(encoding="utf-8").splitlines():
+            name = line.strip()
+            if name and not name.startswith("#") and name not in packages:
+                packages.append(name)
     inst = installed_set(args.manifests)
     if len(inst) < 300:
         sys.exit(f"manifeste suspect ({len(inst)} paquets) : abandon")

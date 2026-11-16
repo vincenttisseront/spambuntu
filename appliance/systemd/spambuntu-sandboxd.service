@@ -1,0 +1,25 @@
+[Unit]
+Description=Spambuntu - sandbox des pièces jointes (analyse statique locale)
+After=network.target
+
+[Service]
+User=spambuntu-sandboxd
+Group=spambuntu-sandboxd
+ExecStart=/usr/bin/python3 -I /opt/spambuntu/current/sandbox/spambuntu_sandboxd.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryMax=768M
+ReadWritePaths=/var/lib/spambuntu/sandbox /var/log/spambuntu/sandbox
+
+[Install]
+WantedBy=multi-user.target

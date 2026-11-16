@@ -18,8 +18,12 @@ PY
 bash -n "$NEW/install.sh"
 
 # Dépendances système déclarées par la nouvelle version (ignorées avec DESTDIR, comme install.sh)
-if [ -z "${DESTDIR:-}" ] && [ -f "$NEW/packages.txt" ]; then
-    mapfile -t packages < <(grep -vE '^\s*(#|$)' "$NEW/packages.txt")
+pkgfile="packages.txt"
+if [ "$(tr -d '[:space:]' < "${DESTDIR:-}/etc/spambuntu/role" 2>/dev/null || true)" = sandbox ]; then
+    pkgfile="packages-sandbox.txt"                                # nœud sandbox : jeu de paquets réduit
+fi
+if [ -z "${DESTDIR:-}" ] && [ -f "$NEW/$pkgfile" ]; then
+    mapfile -t packages < <(grep -vE '^\s*(#|$)' "$NEW/$pkgfile")
     missing=()
     for pkg in "${packages[@]}"; do
         dpkg -s "$pkg" >/dev/null 2>&1 || missing+=("$pkg")

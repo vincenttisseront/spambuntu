@@ -1,0 +1,36 @@
+#cloud-config
+# Installation d'un nœud SANDBOX Spambuntu (worker de détonation) : « autoinstall » d'Ubuntu Server (subiquity).
+#
+# Même ISO que la passerelle antispam, autre entrée de menu. Le disque n'est effacé qu'après confirmation
+# explicite (le paramètre noyau « autoinstall » n'est pas passé). Le compte administrateur et le réseau
+# (adresse fixe recommandée) sont saisis pendant l'installation : aucun mot de passe par défaut dans l'ISO.
+#
+# Prérequis VMware : exposer la virtualisation assistée par le matériel au système invité (vhv.enable = TRUE).
+# Après installation : sudo spambuntu-sandbox check
+autoinstall:
+  version: 1
+  refresh-installer:
+    update: false
+  locale: fr_FR.UTF-8
+  keyboard:
+    layout: fr
+  timezone: Europe/Paris
+  interactive-sections:
+    - identity
+    - network
+  apt:
+    geoip: false
+    fallback: offline-install
+  storage:
+    layout:
+      name: direct
+  ssh:
+    install-server: true
+    allow-pw: true
+  late-commands:
+    - mkdir -p /target/root/spambuntu-install
+    - cp -a /cdrom/spambuntu/. /target/root/spambuntu-install/
+    - >-
+      curtin in-target --target=/target --
+      bash /root/spambuntu-install/install.sh --no-start --role sandbox
+    - rm -rf /target/root/spambuntu-install

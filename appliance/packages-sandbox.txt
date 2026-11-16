@@ -1,0 +1,8 @@
+# Paquets Ubuntu du rôle « sandbox » (worker de détonation) : installés par install.sh --role sandbox.
+# Pas de Postfix, Rspamd, Redis ni console web sur ce nœud.
+python3
+openssl
+sudo
+ca-certificates
+nftables
+cpu-checker

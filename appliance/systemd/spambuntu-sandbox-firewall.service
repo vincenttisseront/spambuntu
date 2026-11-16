@@ -1,0 +1,15 @@
+[Unit]
+Description=Spambuntu - pare-feu du nœud sandbox
+Documentation=file:///opt/spambuntu/current/sandbox/spambuntu_sandbox_node.py
+# Chargé avant le réseau : le worker ne doit jamais être joignable sans ses règles.
+Before=network-pre.target
+Wants=network-pre.target
+ConditionPathExists=/etc/spambuntu/sandbox/nftables.conf
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/spambuntu/sandbox/nftables.conf
+
+[Install]
+WantedBy=multi-user.target

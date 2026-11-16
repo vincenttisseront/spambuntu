@@ -6,8 +6,10 @@
 #
 # L'ISO produite est l'ISO Ubuntu inchangée, plus :
 #   /spambuntu/                 la release Spambuntu (bundle + dépôt apt embarqué des paquets manquants)
-#   /spambuntu-autoinstall/     la configuration d'installation (autoinstall, voir iso/user-data)
-#   et une entrée de menu GRUB « Installer Spambuntu » par défaut.
+#   /spambuntu-autoinstall/     la configuration d'installation de la passerelle (autoinstall, voir iso/user-data)
+#   /spambuntu-autoinstall-sandbox/   celle du nœud sandbox (voir iso/user-data-sandbox ; absente des ISO -CITEST)
+#   et deux entrées de menu GRUB : « Installer Spambuntu » (par défaut, passerelle antispam) et
+#   « Installer Spambuntu Sandbox » (worker de détonation). Même ISO, deux installations.
 # Au démarrage, l'installateur Ubuntu demande confirmation avant d'effacer le disque et crée le compte
 # administrateur ; Spambuntu est ensuite installé (sans accès à internet si l'ISO embarque ses paquets).
 #
@@ -98,6 +100,7 @@ else
 fi
 PAYLOAD="$WORK/payload"
 SEED="$WORK/seed"
+SEED_SANDBOX="$WORK/seed-sandbox"
 mkdir -p "$PAYLOAD" "$SEED" "$WORK/extract"
 
 # --- 3. Release Spambuntu (même archive que celle de la release GitHub) ---------------------------------
@@ -116,13 +119,21 @@ if [ "$EMBED_DEBS" -eq 1 ]; then
         -extract /casper/ubuntu-server-minimal.ubuntu-server.manifest "$WORK/server.manifest" >/dev/null 2>&1 \
         || die "manifestes introuvables dans l'ISO de base"
     python3 -B "$ROOT/tools/iso_debs.py" "$WORK/minimal.manifest" "$WORK/server.manifest" \
-        --packages "$ROOT/appliance/packages.txt" --out "$PAYLOAD/debs"
+        --packages "$ROOT/appliance/packages.txt" "$ROOT/appliance/packages-sandbox.txt" --out "$PAYLOAD/debs"
 fi
 
 # --- 5. Configuration d'installation et GRUB ----------------------------------------------------------
 cp "$ROOT/iso/meta-data" "$SEED/meta-data"
 cp "$ROOT/iso/user-data" "$SEED/user-data"
 KERNEL_ARGS='ds=nocloud\;s=/cdrom/spambuntu-autoinstall/'
+KERNEL_ARGS_SANDBOX='ds=nocloud\;s=/cdrom/spambuntu-autoinstall-sandbox/'
+WITH_SANDBOX=1
+[ "$CI_TEST" -eq 0 ] || WITH_SANDBOX=0        # les ISO de test automatisé ne contiennent que la passerelle
+if [ "$WITH_SANDBOX" -eq 1 ]; then
+    mkdir -p "$SEED_SANDBOX"
+    cp "$ROOT/iso/meta-data" "$SEED_SANDBOX/meta-data"
+    cp "$ROOT/iso/user-data-sandbox" "$SEED_SANDBOX/user-data"
+fi
 if [ "$CI_TEST" -eq 1 ]; then
     KERNEL_ARGS="autoinstall console=ttyS0,115200n8 $KERNEL_ARGS"
     python3 -B "$ROOT/tools/iso_citest.py" "$SEED/user-data"
@@ -143,10 +154,21 @@ chmod u+w "$WORK/grub.orig"
     echo '    initrd /casper/initrd'
     echo '}'
     echo
+    if [ "$WITH_SANDBOX" -eq 1 ]; then
+        echo "menuentry \"Installer Spambuntu Sandbox $VERSION (noeud de detonation)\" {"
+        echo '    set gfxpayload=keep'
+        echo "    linux /casper/vmlinuz $KERNEL_ARGS_SANDBOX ---"
+        echo '    initrd /casper/initrd'
+        echo '}'
+        echo
+    fi
     # Le reste du menu d'origine (noyau HWE, firmware, mémoire ...) est conservé tel quel.
     sed -e '/^set timeout=/d' -e '/^loadfont unicode/d' -e '/^set menu_color_/d' "$WORK/grub.orig"
 } > "$WORK/grub.cfg"
 grep -q 'ds=nocloud' "$WORK/grub.cfg" || die "grub.cfg généré invalide"
+if [ "$WITH_SANDBOX" -eq 1 ]; then
+    grep -q 'spambuntu-autoinstall-sandbox' "$WORK/grub.cfg" || die "entrée GRUB du nœud sandbox absente"
+fi
 
 # --- 6. md5sum.txt (utilisé par « vérifier le disque ») ----------------------------------------------
 xorriso -osirrox on -indev "$BASE" -extract /md5sum.txt "$WORK/md5sum.orig" >/dev/null 2>&1 || true
@@ -157,6 +179,9 @@ if [ -f "$WORK/md5sum.orig" ]; then
         (cd "$WORK" && md5sum ./grub.cfg | sed 's| \./grub.cfg| ./boot/grub/grub.cfg|')
         (cd "$PAYLOAD" && find . -type f -print0 | sort -z | xargs -0 md5sum | sed 's| \./| ./spambuntu/|')
         (cd "$SEED" && find . -type f -print0 | sort -z | xargs -0 md5sum | sed 's| \./| ./spambuntu-autoinstall/|')
+        if [ "$WITH_SANDBOX" -eq 1 ]; then
+            (cd "$SEED_SANDBOX" && find . -type f -print0 | sort -z | xargs -0 md5sum | sed 's| \./| ./spambuntu-autoinstall-sandbox/|')
+        fi
     } > "$WORK/md5sum.txt"
 fi
 
@@ -167,6 +192,7 @@ args=(-indev "$BASE" -outdev "$OUTPUT" -volid "${VOLID:0:32}" -boot_image any re
       -map "$WORK/grub.cfg" /boot/grub/grub.cfg
       -map "$PAYLOAD" /spambuntu
       -map "$SEED" /spambuntu-autoinstall)
+[ "$WITH_SANDBOX" -eq 0 ] || args+=(-map "$SEED_SANDBOX" /spambuntu-autoinstall-sandbox)
 [ ! -f "$WORK/md5sum.txt" ] || args+=(-map "$WORK/md5sum.txt" /md5sum.txt)
 xorriso "${args[@]}" -commit >"$WORK/xorriso.log" 2>&1 || { tail -20 "$WORK/xorriso.log" >&2; die "échec de xorriso"; }
 

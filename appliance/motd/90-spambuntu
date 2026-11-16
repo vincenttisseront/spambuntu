@@ -2,6 +2,14 @@
 # Message affiché à la connexion (installé dans /etc/update-motd.d/ par install.sh)
 [ -d /opt/spambuntu/current ] || exit 0
 version="$(cat /opt/spambuntu/current/VERSION 2>/dev/null || echo '?')"
+if [ "$(cat /etc/spambuntu/role 2>/dev/null)" = sandbox ]; then
+    echo
+    echo "  Spambuntu $version : nœud SANDBOX (aucune console web)"
+    echo "  Contrôles : sudo spambuntu-sandbox status"
+    echo "  Appairage avec la passerelle : menu « Sandbox » de la console de la passerelle"
+    echo
+    exit 0
+fi
 bind="127.0.0.1:8080"; scheme="http"
 if [ -r /etc/spambuntu/webui.env ]; then
     b="$(sed -n 's/^SPAMBUNTU_BIND=//p' /etc/spambuntu/webui.env | tail -n1)"

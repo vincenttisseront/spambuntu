@@ -15,7 +15,10 @@ if [ -z "${SPAMBUNTU_ROLLBACK:-}" ]; then
     mkdir -p "$(dirname "$done_file")"
     touch "$done_file"
     shopt -s nullglob
-    for migration in "$NEW"/hooks/migrations/*.sh; do   # ordre alphabétique : 0001-xxx.sh, 0002-xxx.sh…
+    role="$(tr -d '[:space:]' < "${DESTDIR:-}/etc/spambuntu/role" 2>/dev/null || true)"
+    migrations_dir="$NEW/hooks/migrations"                       # passerelle (rôle par défaut)
+    [ "$role" != sandbox ] || migrations_dir="$NEW/hooks/migrations-sandbox"
+    for migration in "$migrations_dir"/*.sh; do   # ordre alphabétique : 0001-xxx.sh, 0002-xxx.sh…
         name="$(basename "$migration")"
         if grep -qxF "$name" "$done_file"; then
             continue

@@ -3,6 +3,21 @@
 Le contenu de la section d'une version est publié comme notes de release et affiché dans la
 console web de l'appliance au moment de proposer la mise à jour.
 
+## [Non publié]
+
+### Ajouté
+- Sandbox des pièces jointes, premier niveau (désactivé par défaut, modes « observation » puis « application ») :
+  extraction bornée des pièces jointes et des liens, analyse statique (macros et DDE Office, JavaScript PDF,
+  scripts, raccourcis, images disque, HTML smuggling, double extension, archives chiffrées ou imbriquées,
+  bombes de décompression), cache par empreinte, journal d'audit sans contenu. Les verdicts alimentent le
+  moteur de règles (classe « logiciel malveillant » : quarantaine réservée à l'administrateur).
+- Un seul ISO, deux installations : « Spambuntu — passerelle » et « Spambuntu — sandbox (worker de détonation) ».
+  Le rôle est mémorisé et conservé par les mises à jour ; le worker n'a pas de console web, son pare-feu refuse
+  tout sauf SSH et la passerelle, et `spambuntu-sandbox check` vérifie la virtualisation imbriquée (VMware).
+
+### Corrigé
+- La console ne démarrait pas sur une installation neuve (module `spambuntu_ai` introuvable).
+
 ## [0.3.0] - 2026-11-11
 
 ### Ajouté
